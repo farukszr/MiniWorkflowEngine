@@ -1,0 +1,15 @@
+@model MiniWorkflowEngine.ViewModels.WorkflowStepViewModel
+@{ var prefix = ViewData["Prefix"]?.ToString() ?? "Steps[0]"; var roles = (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewData["Roles"]!; }
+<section class="workflow-step-card" aria-label="Onay adımı">
+    <div class="page-heading mb-3"><h3 class="h6 mb-0 step-number">Onay adımı</h3><div class="d-flex gap-1"><button type="button" class="btn btn-outline-secondary btn-sm" data-action="up" aria-label="Adımı yukarı taşı">↑</button><button type="button" class="btn btn-outline-secondary btn-sm" data-action="down" aria-label="Adımı aşağı taşı">↓</button><button type="button" class="btn btn-outline-danger btn-sm" data-action="remove-step">Adımı kaldır</button></div></div>
+    <div class="row g-3"><div class="col-md-7"><label class="form-label w-100">Adım adı<input class="form-control" data-step-field="Name" name="@(prefix).Name" value="@Model.Name" minlength="2" maxlength="150" required /></label></div><div class="col-md-5"><label class="form-label w-100">Onaylayıcı rolü<select class="form-select" data-step-field="ApproverRoleId" name="@(prefix).ApproverRoleId" required><option value="">Rol seçin</option>@foreach (var role in roles) { <option value="@role.Value" selected="@(Model.ApproverRoleId == role.Value)">@role.Text</option> }</select></label></div></div>
+    <div class="conditions mt-3">
+        @for (var j = 0; j < Model.Conditions.Count; j++)
+        {
+            var data = new ViewDataDictionary(ViewData) { ["Prefix"] = $"{prefix}.Conditions[{j}]" };
+            <partial name="_ConditionFields" model="Model.Conditions[j]" view-data="data" />
+        }
+    </div>
+    <button type="button" class="btn btn-link btn-sm px-0 mt-2" data-action="add-condition">+ Koşul ekle</button>
+    <p class="small text-muted mb-0">Koşul yoksa adım koşulsuzdur. Birden fazla koşul VE ile birleşir.</p>
+</section>

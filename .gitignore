@@ -1,0 +1,29 @@
+# Derleme çıktıları
+[Bb]in/
+[Oo]bj/
+
+# IDE ve kullanıcı ayarları
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Yerel yapılandırma ve gizli bilgiler
+appsettings.Local.json
+.env
+.env.*
+!.env.example
+
+# Test ve yayın çıktıları
+TestResults/
+artifacts/
+publish/
+*.log
+
+# Yerel SQL verileri ve sertifikalar
+*.mdf
+*.ldf
+*.bak
+*.pfx
+*.p12

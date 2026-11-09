@@ -1,0 +1,73 @@
+@model MiniWorkflowEngine.ViewModels.RequestListViewModel
+@using MiniWorkflowEngine.Domain
+@using MiniWorkflowEngine.Domain.Enums
+@using MiniWorkflowEngine.ViewModels
+@{
+    var inbox = Model.Scope == RequestListScope.Inbox;
+    var showRequester = Model.Scope != RequestListScope.Mine;
+    var now = DateTimeOffset.UtcNow;
+    var (title, action, description) = Model.Scope switch
+    {
+        RequestListScope.Inbox => ("Bekleyen onaylar", "Inbox", "Rolünüze atanmış, kararınızı bekleyen talepler."),
+        RequestListScope.All => ("Tüm talepler", "All", "Talepleri durumuna göre inceleyin ve işlem geçmişini takip edin."),
+        _ => ("Taleplerim", "Index", "Taslaklarınızı ve gönderdiğiniz taleplerin durumunu takip edin.")
+    };
+    ViewData["Title"] = title;
+}
+<section class="my-4">
+    <div class="page-heading"><div><span class="eyebrow">ÇALIŞMA ALANI / TALEPLER</span><h1 class="h2 mt-2">@title</h1><p class="text-muted mb-0">@description</p></div><a class="btn btn-primary" asp-action="Create">+ Talep oluştur</a></div>
+    <div class="surface-card mt-4">
+        <form asp-action="@action" method="get" class="directory-search" role="search">
+            <div class="flex-grow-1"><label for="search" class="form-label">Başlık veya süreç adı</label><input class="form-control" id="search" name="search" value="@Model.Search" maxlength="100" placeholder="Talep ara…" /></div>
+            @if (!inbox)
+            {
+                <div><label for="status" class="form-label">Durum</label><select class="form-select request-filter" id="status" name="status"><option value="">Tüm durumlar</option>@foreach (var status in Enum.GetValues<RequestStatus>()) { <option value="@((int)status)" selected="@(Model.Status == status)">@RequestLabels.Status(status)</option> }</select></div>
+            }
+            @if (showRequester)
+            {
+                <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="overdue" value="true" checked="@Model.Overdue" /> Yalnızca gecikenler</label>
+            }
+            <button class="btn btn-outline-primary">Filtrele</button><a asp-action="@action" class="btn btn-link">Temizle</a>
+        </form>
+        @if (showRequester)
+        {
+            <p class="small text-muted mt-3 mb-0">Bir talep aynı onay adımında @ApprovalWaiting.OverdueHours saat beklediğinde gecikmiş sayılır.</p>
+        }
+        <p class="small text-muted mt-3">@Model.TotalCount talep · Sayfa @Model.Page / @Model.TotalPages</p>
+        @if (Model.Items.Count == 0)
+        {
+            <div class="empty-state"><h2 class="h5">@(inbox ? "Bekleyen onay bulunmuyor" : "Talep bulunamadı")</h2><p class="text-muted mb-0">@(inbox ? "Sırası gelen ve rolünüze atanan talepler burada görünecek. Kendi talepleriniz bu listeye dahil edilmez." : "Arama ve durum filtrelerinizi değiştirebilirsiniz.")</p></div>
+        }
+        else
+        {
+            <div class="table-responsive"><table class="table align-middle user-table"><caption class="visually-hidden">@ViewData["Title"]</caption><thead><tr><th scope="col">Talep</th>@if (showRequester) { <th scope="col">Talep sahibi</th> }<th scope="col">Durum / adım</th><th scope="col">Tutar</th><th scope="col">Oluşturulma (UTC)</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead><tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><a class="fw-semibold text-decoration-none" asp-action="Details" asp-route-id="@item.Id" asp-route-scope="@Model.Scope">#@item.Id · @item.Title</a><span class="d-block small text-muted">@item.WorkflowName · v@(item.WorkflowVersion)</span></td>
+                    @if (showRequester) { <td>@item.RequesterName</td> }
+                    <td>
+                        <span class="request-status @RequestLabels.StatusClass(item.Status)">@RequestLabels.Status(item.Status)</span>
+                        @if (item.CurrentStepName is not null) { <span class="d-block small text-muted mt-1">@item.CurrentStepName</span> }
+                        @if (item.WaitingSince is { } since)
+                        {
+                            <span class="d-block small mt-1 @(ApprovalWaiting.IsOverdue(since, now) ? "text-danger fw-semibold" : "text-muted")">@(ApprovalWaiting.IsOverdue(since, now) ? "Gecikti · " : "")@ApprovalWaiting.Duration(since, now) bekliyor</span>
+                        }
+                    </td>
+                    <td class="text-nowrap">@(item.Amount?.ToString("N2") ?? "—")</td><td class="small text-muted text-nowrap">@item.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td class="text-end"><a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@item.Id" asp-route-scope="@Model.Scope">İncele</a></td>
+                </tr>
+            }
+            </tbody></table></div>
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="d-flex justify-content-between mt-3" aria-label="Talep sayfaları">
+                    @if (Model.Page > 1) { <a class="btn btn-outline-secondary btn-sm" asp-action="@action" asp-route-search="@Model.Search" asp-route-status="@((int?)Model.Status)" asp-route-overdue="@Model.Overdue" asp-route-page="@(Model.Page - 1)">← Önceki</a> } else { <span></span> }
+                    @if (Model.Page < Model.TotalPages) { <a class="btn btn-outline-secondary btn-sm" asp-action="@action" asp-route-search="@Model.Search" asp-route-status="@((int?)Model.Status)" asp-route-overdue="@Model.Overdue" asp-route-page="@(Model.Page + 1)">Sonraki →</a> }
+                </nav>
+            }
+        }
+    </div>
+</section>
+
+

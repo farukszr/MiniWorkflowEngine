@@ -1,0 +1,102 @@
+@model MiniWorkflowEngine.ViewModels.HomeViewModel
+@using MiniWorkflowEngine.Domain.Enums
+@{
+    ViewData["Title"] = "Ana Sayfa";
+    var needsSetup = Model.AllPendingRequests.HasValue && !Model.HasActiveWorkflow;
+    var showManagementQueue = Model.AllPendingRequests > 0 && Model.AssignedApprovals == 0;
+    var (heading, description) = (needsSetup, Model.AssignedApprovals > 0, showManagementQueue, Model.HasActiveWorkflow, Model.RequestDraft) switch
+    {
+        (true, _, _, _, _) => ("İlk sürecinizi kullanıma açın", "Bir süreç yayımlandığında kullanıcılar o süreç üzerinden talep gönderebilir."),
+        (_, true, _, _, _) => ($"Kararınızı bekleyen {Model.AssignedApprovals} talep var", "Talepleri inceleyip onaylayın veya gerekçesiyle reddedin."),
+        (_, _, true, _, _) => ($"{Model.AllPendingRequests} talep onay bekliyor", "Bekleyen adımları takip edin ve gerektiğinde yönetici olarak karar verin."),
+        (_, _, _, _, { } draft) => ("Taslağınıza devam edin", $"“{draft.Title}” taslak olarak kayıtlı. Hazırsa detayından onaya gönderebilirsiniz."),
+        (_, _, _, true, _) => ("Yeni bir talep başlatın", "Süreci seçin, talebinizi yazın ve detay ekranından onaya gönderin."),
+        _ => ("Talep oluşturmak için süreç bekleniyor", "Kurum yöneticiniz bir süreç yayımladığında bu ekrandan talep oluşturabilirsiniz.")
+    };
+}
+<section class="home-focus" aria-labelledby="home-heading">
+    <span class="eyebrow">Çalışma alanınız</span>
+    <h1 id="home-heading">@heading</h1>
+    <p>@description</p>
+    <div class="d-flex flex-wrap gap-2">
+        @if (needsSetup && Model.WorkflowDraftId is { } workflowId)
+        {
+            <a class="btn btn-welcome" asp-controller="Workflows" asp-action="Details" asp-route-id="@workflowId">Süreç taslağını aç</a>
+        }
+        else if (needsSetup)
+        {
+            <a class="btn btn-welcome" asp-controller="Workflows" asp-action="Create">Süreç oluştur</a>
+        }
+        else if (Model.AssignedApprovals > 0)
+        {
+            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Inbox">Bekleyen onayları aç</a>
+        }
+        else if (showManagementQueue)
+        {
+            <a class="btn btn-welcome" asp-controller="Requests" asp-action="All" asp-route-status="@RequestStatus.Pending">Bekleyen talepleri aç</a>
+        }
+        else if (Model.RequestDraft is { } draft)
+        {
+            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Details" asp-route-id="@draft.Id" asp-route-scope="Mine">Talep taslağını aç</a>
+        }
+        else if (Model.HasActiveWorkflow)
+        {
+            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Create">Talep oluştur</a>
+        }
+    </div>
+</section>
+
+@if (needsSetup)
+{
+    <section class="surface-card workspace-section" aria-labelledby="first-workflow-title">
+        <h2 id="first-workflow-title" class="h5">İlk masraf onayını deneyin</h2>
+        <ol class="home-steps mb-0">
+            <li><a asp-controller="Users" asp-action="Index">Kullanıcı yönetimi</a> ekranında talebi gönderecek kişiye <strong>Çalışan</strong>, karar verecek kişiye <strong>Onaylayıcı</strong> rolünü verin. Bu örnek için iki ayrı hesap kullanın.</li>
+            <li><a asp-controller="Workflows" asp-action="Index">Süreç tanımları</a> ekranında <strong>Masraf onayı</strong> adında bir süreç oluşturun. <strong>Masrafı incele</strong> adımını ekleyip rol olarak <strong>Onaylayıcı</strong> seçin. <strong>Taslağı kaydet</strong> ve ardından <strong>Yayımla</strong> düğmesine basın.</li>
+            <li>Çalışan hesabıyla <strong>Talep oluştur → Taslağı kaydet → Onaya gönder</strong> adımlarını izleyin. Onaylayıcı hesabıyla <strong>Bekleyen onaylar → İncele</strong> yolundan karar verin.</li>
+        </ol>
+    </section>
+}
+
+<section class="workspace-section" aria-labelledby="work-title">
+    <div class="section-heading"><h2 id="work-title">Günlük işlemler</h2></div>
+    <div class="shortcut-grid">
+        @if (Model.HasActiveWorkflow)
+        {
+            <a class="shortcut-card" asp-controller="Requests" asp-action="Create">
+                <span class="shortcut-icon"><partial name="_Icon" model='"plus"' /></span>
+                <h3>Talep oluştur</h3><p>Yayımlanmış bir süreç üzerinden yeni talep başlatın.</p>
+                <span class="shortcut-arrow"><partial name="_Icon" model='"arrow"' /></span>
+            </a>
+        }
+        <a class="shortcut-card" asp-controller="Requests" asp-action="Index">
+            <span class="shortcut-icon"><partial name="_Icon" model='"requests"' /></span>
+            <h3>Taleplerim</h3><p>Taslaklarınızı ve gönderdiğiniz taleplerin son durumunu görün.</p>
+            <span class="shortcut-arrow"><partial name="_Icon" model='"arrow"' /></span>
+        </a>
+        @if (Model.ShowApprovalCard)
+        {
+            <a class="shortcut-card" asp-controller="Requests" asp-action="Inbox">
+                <span class="shortcut-icon accent-gold"><partial name="_Icon" model='"inbox"' /></span>
+                <h3>Bekleyen onaylar</h3>
+                <p>@(Model.AssignedApprovals > 0 ? $"Kararınızı bekleyen {Model.AssignedApprovals} talep var." : "Şu anda kararınızı bekleyen talep bulunmuyor.")</p>
+                <span class="shortcut-arrow"><partial name="_Icon" model='"arrow"' /></span>
+            </a>
+        }
+        @if (Model.AllPendingRequests is { } allPending)
+        {
+            <a class="shortcut-card" asp-controller="Requests" asp-action="All" asp-route-status="@RequestStatus.Pending">
+                <span class="shortcut-icon accent-gold"><partial name="_Icon" model='"inbox"' /></span>
+                <h3>Yönetici olarak bekleyenleri gör</h3><p>@allPending talep onay bekliyor. Gerektiğinde ilgili adım için karar verin.</p>
+                <span class="shortcut-arrow"><partial name="_Icon" model='"arrow"' /></span>
+            </a>
+        }
+    </div>
+</section>
+@if (Model.AllPendingRequests.HasValue)
+{
+    <section class="workspace-section" aria-labelledby="management-title">
+        <div class="section-heading"><h2 id="management-title">Yönetim</h2><p>Hesapları, süreçleri ve yönetim işlemlerini takip edin.</p></div>
+        <partial name="_ManagementShortcuts" />
+    </section>
+}

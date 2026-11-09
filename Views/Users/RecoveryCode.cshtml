@@ -1,0 +1,23 @@
+@model MiniWorkflowEngine.ViewModels.RecoveryCodeViewModel
+@using MiniWorkflowEngine.Services
+@{ ViewData["Title"] = "Şifre kurtarma"; }
+<section class="my-4">
+    <a asp-action="Index" class="small text-decoration-none">← Kullanıcılara dön</a>
+    <h1 class="h2 mt-3">Şifre kurtarma</h1>
+    <div class="surface-card mt-4">
+        <p><strong>@Model.FullName</strong><br /><span class="text-muted">@Model.Email</span></p>
+        @if (Model.Code is null)
+        {
+            <p>Önce kullanıcının kimliğini doğrulayın. Kodu oluşturduktan sonra güvenli bir kanaldan doğrudan kullanıcıyla paylaşın.</p>
+            <form asp-action="IssueRecoveryCode" asp-route-id="@Model.UserId" method="post">
+                <button class="btn btn-primary">Kurtarma kodu oluştur</button>
+            </form>
+        }
+        else
+        {
+            <label for="recovery-code" class="form-label">Tek kullanımlık kurtarma kodu</label>
+            <input id="recovery-code" class="form-control font-monospace" value="@Model.Code" readonly autocomplete="off" />
+            <p class="text-muted mt-3 mb-0">Kod @PasswordRecoveryService.ValidMinutes dakika geçerlidir. Kullanıcı giriş ekranındaki <strong>Şifremi unuttum</strong> bağlantısından yeni şifresini belirleyebilir.</p>
+        }
+    </div>
+</section>

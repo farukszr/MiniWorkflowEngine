@@ -1,0 +1,27 @@
+@model MiniWorkflowEngine.ViewModels.WorkflowListViewModel
+@{ ViewData["Title"] = "Süreç tanımları"; }
+<section class="my-4">
+    <div class="page-heading"><div><span class="eyebrow">YÖNETİM / SÜREÇ TASARIMI</span><h1 class="h2 mt-2">Süreç tanımları</h1><p class="text-muted mb-0">Onay sırasını, rollerini ve koşullarını tanımlayın.</p></div><a class="btn btn-primary" asp-action="Create">+ Süreç oluştur</a></div>
+    <div class="surface-card mt-4">
+        <form method="get" class="directory-search" role="search"><div class="flex-grow-1"><label for="search" class="form-label">Süreç kodu veya adı</label><input class="form-control" id="search" name="search" value="@Model.Search" maxlength="100" placeholder="Süreç ara…" /></div><button class="btn btn-outline-primary">Ara</button><a asp-action="Index" class="btn btn-link">Temizle</a></form>
+        <p class="small text-muted mt-3">@Model.TotalCount sürüm · Sayfa @Model.Page / @Model.TotalPages</p>
+        @if (Model.Items.Count == 0) { <div class="empty-state"><h2 class="h5">Süreç bulunamadı</h2><p class="text-muted">Yeni bir süreç oluşturarak başlayın veya aramanızı değiştirin.</p></div> }
+        else
+        {
+            <div class="table-responsive"><table class="table align-middle user-table"><caption class="visually-hidden">Süreçler ve sürümleri</caption><thead><tr><th>Süreç</th><th>Sürüm</th><th>Adım</th><th>Durum</th><th><span class="visually-hidden">İşlem</span></th></tr></thead><tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr><td><span class="fw-semibold">@item.Name</span><span class="d-block small text-muted">@item.Code</span></td><td>v@(item.Version)</td><td>@item.StepCount</td><td><span class="role-badge">@(item.IsActive ? "Etkin" : item.IsPublished ? "Arşiv" : "Taslak")</span></td><td class="text-end"><a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@item.Id">İncele</a></td></tr>
+            }
+            </tbody></table></div>
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="d-flex justify-content-between mt-3" aria-label="Süreç sayfaları">
+                    @if (Model.Page > 1) { <a class="btn btn-outline-secondary btn-sm" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)">← Önceki</a> } else { <span></span> }
+                    @if (Model.Page < Model.TotalPages) { <a class="btn btn-outline-secondary btn-sm" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)">Sonraki →</a> }
+                </nav>
+            }
+        }
+    </div>
+</section>
+

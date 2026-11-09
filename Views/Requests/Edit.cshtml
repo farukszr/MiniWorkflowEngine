@@ -1,0 +1,44 @@
+@model MiniWorkflowEngine.ViewModels.RequestEditorViewModel
+@{ var isNew = Model.Id == 0; ViewData["Title"] = isNew ? "Talep oluştur" : "Taslağı düzenle"; }
+<section class="surface-card user-form my-4 mx-auto">
+    <a asp-action="Index" class="small text-decoration-none">← Taleplerime dön</a><h1 class="h2 mt-4">@ViewData["Title"]</h1>
+    @if (isNew && Model.Workflows.Count == 0)
+    {
+        <div class="alert alert-info">Henüz etkin ve yayımlanmış bir süreç bulunmuyor. Kurum yöneticinizin bir süreç yayımlaması gerekiyor.</div>
+        @if (User.IsInRole(MiniWorkflowEngine.Domain.ApplicationRoles.Administrator))
+        {
+            <a asp-controller="Workflows" asp-action="Index" class="btn btn-primary">Süreç tanımlarına git</a>
+        }
+    }
+    else
+    {
+        <p class="text-muted">Bilgileri doldurup <strong>Taslağı kaydet</strong> düğmesine basın. Açılan talep detayında <strong>Onaya gönder</strong> dediğinizde süreç başlar.</p>
+        <form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? (int?)null : Model.Id)" method="post" id="request-editor">
+            <input asp-for="Id" type="hidden" /><input asp-for="RowVersion" type="hidden" />
+            <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+            <div class="mb-3"><label asp-for="WorkflowDefinitionId" class="form-label"></label>
+                @if (isNew)
+                {
+                    <select asp-for="WorkflowDefinitionId" class="form-select" aria-describedby="process-help"><option value="0">Süreç seçin</option>@foreach (var workflow in Model.Workflows) { <option value="@workflow.Id" data-amount="@workflow.RequiresAmount.ToString().ToLowerInvariant()" data-department="@workflow.RequiresDepartment.ToString().ToLowerInvariant()">@workflow.Name · v@(workflow.Version)</option> }</select>
+                }
+                else
+                {
+                    var workflow = Model.Workflows.FirstOrDefault(x => x.Id == Model.WorkflowDefinitionId);
+                    <input asp-for="WorkflowDefinitionId" type="hidden" /><p class="form-control bg-light mb-0">@workflow?.Name · v@(workflow?.Version)</p>
+                    @if (workflow is { IsActive: false }) { <p class="small text-danger mt-2">Bu süreç sürümü arşivlendi. Göndermek için etkin sürümle yeni bir talep oluşturun.</p> }
+                }
+                <span asp-validation-for="WorkflowDefinitionId" class="text-danger small"></span><p id="process-help" class="small text-muted mt-2">Tutar veya departman koşulu olan süreçlerde bu alanlar onaya gönderirken zorunludur.</p>
+            </div>
+            <div class="mb-3"><label asp-for="Title" class="form-label"></label><input asp-for="Title" class="form-control" placeholder="Örn. Müşteri ziyareti ulaşım masrafı" /><span asp-validation-for="Title" class="text-danger small"></span></div>
+            <div class="mb-3"><label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control" rows="5" placeholder="Neye onay istediğinizi ve nedenini yazın."></textarea><span asp-validation-for="Description" class="text-danger small"></span></div>
+            <div class="row g-3 mb-4"><div class="col-md-6"><label asp-for="Amount" class="form-label"></label><input asp-for="Amount" class="form-control" inputmode="decimal" placeholder="1000,50" aria-describedby="amount-help" /><span asp-validation-for="Amount" class="text-danger small"></span><p id="amount-help" class="small text-muted mt-2">Binlik ayırıcı kullanmayın; en fazla iki ondalık basamak girin.</p></div><div class="col-md-6"><label asp-for="Department" class="form-label"></label><input asp-for="Department" class="form-control" placeholder="Örn. Finans" /><span asp-validation-for="Department" class="text-danger small"></span></div></div>
+            <div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit">Taslağı kaydet</button><a asp-action="Index" class="btn btn-outline-secondary">Vazgeç</a>@if (!isNew) { <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-link">Güncel taslağı yükle</a> }</div>
+        </form>
+    }
+</section>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/request-editor.js" asp-append-version="true"></script>
+}
+
+

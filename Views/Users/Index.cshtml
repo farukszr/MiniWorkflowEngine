@@ -1,0 +1,57 @@
+@model MiniWorkflowEngine.ViewModels.UserListViewModel
+@using MiniWorkflowEngine.Domain
+@{ ViewData["Title"] = "Kullanıcılar"; }
+<section class="my-4">
+    <div class="page-heading">
+        <div><span class="eyebrow">YÖNETİM / ERİŞİM</span><h1 class="h2 mt-2">Kullanıcılar</h1><p class="text-muted mb-0">Çalışma alanındaki hesapları ve rollerini yönetin.</p></div>
+        <a class="btn btn-primary" asp-action="Create">+ Kullanıcı oluştur</a>
+    </div>
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success mt-3" role="status">@success</div>
+    }
+    <div class="surface-card mt-4 user-directory">
+        <form method="get" asp-action="Index" class="directory-search" role="search">
+            <div class="flex-grow-1"><label for="search" class="form-label">Ad veya e-posta ile ara</label><input id="search" name="search" value="@Model.Search" maxlength="100" class="form-control" placeholder="Kullanıcı ara…" /></div>
+            <button type="submit" class="btn btn-outline-primary">Ara</button>
+            @if (!string.IsNullOrEmpty(Model.Search)) { <a asp-action="Index" class="btn btn-link">Temizle</a> }
+        </form>
+        <p class="small text-muted mt-3">@Model.TotalCount kullanıcı · Sayfa @Model.Page / @Model.TotalPages</p>
+        @if (Model.Users.Count == 0)
+        {
+            <div class="empty-state"><h2 class="h5">Kullanıcı bulunamadı</h2><p class="text-muted mb-0">Aramanızı değiştirebilir veya yeni bir kullanıcı oluşturabilirsiniz.</p></div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle user-table">
+                    <caption class="visually-hidden">Kullanıcı hesapları ve atanmış roller</caption>
+                    <thead><tr><th scope="col">Kullanıcı</th><th scope="col">Roller</th><th scope="col">Oluşturulma (UTC)</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var user in Model.Users)
+                    {
+                        <tr>
+                            <td><span class="fw-semibold">@user.FullName</span><span class="d-block small text-muted">@user.Email</span></td>
+                            <td><div class="d-flex flex-wrap gap-1">@foreach (var role in user.Roles) { <span class="role-badge">@ApplicationRoles.DisplayName(role)</span> }</div></td>
+                            <td class="small text-muted">@user.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="text-end">
+                                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                    <a asp-action="Roles" asp-route-id="@user.Id" class="btn btn-outline-secondary btn-sm" aria-label="@user.FullName için rolleri düzenle">Rolleri düzenle</a>
+                                    <a asp-action="RecoveryCode" asp-route-id="@user.Id" class="btn btn-outline-secondary btn-sm" aria-label="@user.FullName için şifre kurtarma">Şifre kurtarma</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Kullanıcı sayfaları" class="d-flex justify-content-between gap-3 mt-3">
+                    @if (Model.Page > 1) { <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)">← Önceki</a> } else { <span></span> }
+                    @if (Model.Page < Model.TotalPages) { <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)">Sonraki →</a> }
+                </nav>
+            }
+        }
+    </div>
+</section>

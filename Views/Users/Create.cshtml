@@ -1,0 +1,17 @@
+@model MiniWorkflowEngine.ViewModels.CreateUserViewModel
+@{ ViewData["Title"] = "Kullanıcı oluştur"; }
+<section class="surface-card user-form my-4 mx-auto">
+    <a asp-action="Index" class="small text-decoration-none">← Kullanıcılara dön</a>
+    <h1 class="h2 mt-4">Kullanıcı oluştur</h1>
+    <p class="text-muted">Hesap bilgilerini girin ve erişim rollerini seçin.</p>
+    <form asp-action="Create" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger validation-summary" role="alert"></div>
+        <div class="mb-3"><label asp-for="FullName" class="form-label"></label><input asp-for="FullName" class="form-control" autocomplete="name" /><span asp-validation-for="FullName" class="text-danger small"></span></div>
+        <div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" class="form-control" autocomplete="off" /><span asp-validation-for="Email" class="text-danger small"></span></div>
+        <div class="mb-3"><label asp-for="Password" class="form-label"></label><input asp-for="Password" class="form-control" autocomplete="new-password" aria-describedby="password-help" /><span asp-validation-for="Password" class="text-danger small"></span><p id="password-help" class="small text-muted mt-2">10–128 karakter; büyük ve küçük harf, rakam ve özel karakter. Parolayı kullanıcıyla güvenli bir kanaldan paylaşın.</p></div>
+        <div class="mb-4"><label asp-for="ConfirmPassword" class="form-label"></label><input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" /><span asp-validation-for="ConfirmPassword" class="text-danger small"></span></div>
+        <partial name="_RolePicker" model="Model.Roles" />
+        <div class="d-flex flex-wrap gap-2"><button type="submit" class="btn btn-primary">Kullanıcı oluştur</button><a asp-action="Index" class="btn btn-outline-secondary">Vazgeç</a></div>
+    </form>
+</section>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

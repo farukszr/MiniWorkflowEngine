@@ -1,0 +1,72 @@
+@model MiniWorkflowEngine.ViewModels.RequestDetailsViewModel
+@using MiniWorkflowEngine.Domain
+@using MiniWorkflowEngine.Domain.Enums
+@using MiniWorkflowEngine.ViewModels
+@{
+    var request = Model.Request;
+    var (listAction, listLabel) = Model.Scope switch
+    {
+        RequestListScope.Inbox => ("Inbox", "Bekleyen onaylar"),
+        RequestListScope.All => ("All", "Tüm talepler"),
+        _ => ("Index", "Taleplerim")
+    };
+    ViewData["Title"] = $"Talep #{request.Id}";
+    ViewData["RequestNavigation"] = listAction;
+}
+<section class="my-4">
+    <div class="d-flex flex-wrap gap-3">
+        <a asp-action="@listAction" class="small text-decoration-none">← @listLabel</a>
+    </div>
+    <div class="page-heading mt-3"><div><span class="eyebrow">TALEP #@request.Id · @request.WorkflowName · v@(request.WorkflowVersion)</span><h1 class="h2 mt-2 request-title">@request.Title</h1></div><span class="request-status @RequestLabels.StatusClass(request.Status)">@RequestLabels.Status(request.Status)</span></div>
+    @if (Model.WaitingSince is { } since)
+    {
+        var now = DateTimeOffset.UtcNow;
+        <p class="mt-2 @(ApprovalWaiting.IsOverdue(since, now) ? "text-danger fw-semibold" : "text-muted")">@(ApprovalWaiting.IsOverdue(since, now) ? "Gecikti · " : "")Bu adımda @ApprovalWaiting.Duration(since, now) bekliyor.</p>
+    }
+    @if (TempData["Success"] is string success) { <div class="alert alert-success mt-3" role="status">@success</div> }
+    <div asp-validation-summary="All" class="text-danger validation-summary mt-3" role="alert"></div>
+    <div class="request-layout mt-4">
+        <div>
+            <section class="surface-card">
+                <h2 class="h5">Talep bilgileri</h2><p class="request-description mt-3">@request.Description</p>
+                <dl class="request-facts"><div><dt>Talep sahibi</dt><dd>@Model.RequesterName</dd></div><div><dt>Tutar</dt><dd>@(request.Amount?.ToString("N2") ?? "Belirtilmedi")</dd></div><div><dt>Departman</dt><dd>@(request.Department ?? "Belirtilmedi")</dd></div><div><dt>Oluşturulma (UTC)</dt><dd>@request.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</dd></div><div><dt>Geçerli adım</dt><dd>@(request.CurrentStepName ?? "—")</dd></div>@if (request.CompletedAt is not null) { <div><dt>Tamamlanma (UTC)</dt><dd>@request.CompletedAt.Value.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</dd></div> }</dl>
+                @if (Model.CanEdit)
+                {
+                    <div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@request.Id">Taslağı düzenle</a>
+                    @if (Model.CanSubmit)
+                    {
+                        <form asp-action="Submit" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><button class="btn btn-primary">Onaya gönder</button></form>
+                    }
+                    </div>
+                    @if (!Model.IsWorkflowActive) { <p class="small text-danger mt-3">Bu taslağın süreç sürümü arşivlendi. Etkin sürümle yeni talep oluşturun.</p> }
+                }
+            </section>
+            @if (Model.CanDecide)
+            {
+                <section class="surface-card mt-4"><h2 class="h5">Onay kararı</h2><p class="text-muted small">@request.CurrentStepName adımı için karar verin. Ret işleminde gerekçe zorunludur.</p>
+                    @if (Model.IsAdministrativeDecision)
+                    {
+                        <p class="alert alert-warning py-2 small">Bu adım için yönetici olarak karar veriyorsunuz. Kararınız işlem geçmişine yönetici kararı olarak kaydedilir.</p>
+                    }
+                    <form asp-action="Approve" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" />
+                        <input type="hidden" name="Scope" value="@Model.Scope" />
+                        <label asp-for="Comment" class="form-label"></label><textarea asp-for="Comment" class="form-control mb-2" rows="3" maxlength="2000"></textarea><span asp-validation-for="Comment" class="text-danger small"></span>
+                        <div class="d-flex gap-2 mt-3"><button class="btn btn-success" type="submit">Onayla</button><button class="btn btn-outline-danger" type="submit" formaction="@Url.Action("Reject", new { id = request.Id })">Reddet</button></div>
+                    </form>
+                </section>
+            }
+            @if (Model.CanCancel)
+            {
+                <section class="surface-card mt-4"><h2 class="h6">Talebi iptal et</h2><p class="small text-muted">İptal edilen talep yeniden gönderilemez.</p><form asp-action="Cancel" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><label for="cancel-note" class="form-label small">İptal notu (isteğe bağlı)</label><textarea id="cancel-note" name="Comment" class="form-control mb-3" rows="2" maxlength="2000">@Model.Comment</textarea><button class="btn btn-outline-secondary btn-sm">Talebi iptal et</button></form></section>
+            }
+        </div>
+        <section class="surface-card history-card"><h2 class="h5">İşlem geçmişi</h2><p class="small text-muted">Tüm zamanlar UTC olarak gösterilir.</p><ol class="request-history">
+            @foreach (var item in request.History)
+            {
+                <li><span class="fw-semibold">@RequestLabels.Action(item.ActionType)</span>@if (item.StepName is not null) { <span class="d-block small">@item.StepName</span> }<span class="d-block small text-muted">@item.ActorName · @item.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm:ss")</span>@if (!string.IsNullOrWhiteSpace(item.Comment)) { <p class="small request-description mt-2 mb-0">@item.Comment</p> }</li>
+            }
+        </ol></section>
+    </div>
+</section>
+
+

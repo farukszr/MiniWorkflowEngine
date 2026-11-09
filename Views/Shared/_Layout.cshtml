@@ -1,0 +1,102 @@
+@using MiniWorkflowEngine.Domain
+@{
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var isAdmin = User.IsInRole(ApplicationRoles.Administrator);
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var action = ViewData["RequestNavigation"] as string ?? ViewContext.RouteData.Values["action"]?.ToString();
+    var accountName = User.Identity?.Name ?? "";
+    var accountRoles = string.Join(" · ", ApplicationRoles.All.Where(User.IsInRole).Select(ApplicationRoles.DisplayName));
+    var nav = new List<(string Controller, string Action, string Label, string Icon)>
+    {
+        ("Home", "Index", "Ana Sayfa", "home"),
+        ("Requests", "Index", "Taleplerim", "requests"),
+        ("Requests", "Inbox", "Bekleyen onaylar", "inbox")
+    };
+    var adminNav = new List<(string Controller, string Action, string Label, string Icon)>
+    {
+        ("Administration", "Index", "Yönetim", "settings"),
+        ("Users", "Index", "Kullanıcı yönetimi", "users"),
+        ("Workflows", "Index", "Süreç tanımları", "workflow"),
+        ("Administration", "History", "Yönetim geçmişi", "requests"),
+        ("Requests", "All", "Tüm talepler", "requests")
+    };
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MiniWorkflowEngine</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="@(signedIn ? "workspace-body" : "public-body")">
+    <a class="skip-link" href="#main-content">İçeriğe geç</a>
+    @if (signedIn)
+    {
+        <div class="workspace-shell">
+            <aside class="workspace-sidebar" aria-label="Çalışma alanı menüsü">
+                <div class="sidebar-heading">
+                    <a class="brand" asp-controller="Home" asp-action="Index"><span class="brand-mark"><partial name="_Icon" model='"brand"' /></span><span class="brand-name">MiniWorkflowEngine</span></a>
+                    <button class="btn mobile-menu-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation" aria-expanded="false" aria-label="Menüyü aç/kapat">
+                        <partial name="_Icon" model='"menu"' />
+                        <span class="approval-count" aria-hidden="true" hidden></span>
+                    </button>
+                </div>
+                <div id="main-navigation" class="collapse sidebar-content">
+                    <nav aria-label="Ana menü">
+                        <p class="nav-caption">Çalışma alanı</p>
+                        @foreach (var item in nav)
+                        {
+                            var active = controller == item.Controller && (action == item.Action || (item.Action == "Index" && controller == "Requests" && action is not ("Inbox" or "All")));
+                            var isInbox = item.Action == "Inbox";
+                            <a class="workspace-link @(active ? "is-active" : "")" asp-controller="@item.Controller" asp-action="@item.Action" aria-current="@(active ? "page" : null)" data-approval-url="@(isInbox ? Url.Action("PendingCount", "Requests") : null)">
+                                <partial name="_Icon" model="item.Icon" />@item.Label
+                                @if (isInbox)
+                                {
+                                    <span class="approval-count" aria-hidden="true" hidden></span>
+                                }
+                            </a>
+                        }
+                        @if (isAdmin)
+                        {
+                            <p class="nav-caption nav-caption-spaced">Yönetici alanı</p>
+                            @foreach (var item in adminNav)
+                            {
+                                var active = controller == item.Controller && (controller is not ("Requests" or "Administration") || action == item.Action);
+                                <a class="workspace-link @(active ? "is-active" : "")" asp-controller="@item.Controller" asp-action="@item.Action" aria-current="@(active ? "page" : null)"><partial name="_Icon" model="item.Icon" />@item.Label</a>
+                            }
+                        }
+                    </nav>
+                    <div class="sidebar-account">
+                        <div class="account-summary">
+                            <span class="account-avatar" aria-hidden="true">@(accountName.Length > 0 ? accountName[..1].ToUpperInvariant() : "K")</span>
+                            <span class="account-identity"><span class="account-name" title="@accountName">@accountName</span><span class="account-role">@accountRoles</span></span>
+                        </div>
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button class="workspace-link logout-link" type="submit"><partial name="_Icon" model='"logout"' />Çıkış yap</button>
+                        </form>
+                    </div>
+                </div>
+            </aside>
+            <div class="workspace-content">
+                <header class="workspace-topbar">
+                    <span>Çalışma alanı</span><span aria-hidden="true">/</span><strong>@ViewData["Title"]</strong>
+                </header>
+                <main id="main-content" class="workspace-main" tabindex="-1">@RenderBody()</main>
+                <footer class="app-footer"><span>MiniWorkflowEngine</span><a asp-controller="Home" asp-action="Privacy">Gizlilik</a></footer>
+            </div>
+        </div>
+    }
+    else
+    {
+        <header class="public-header"><a class="brand" asp-controller="Home" asp-action="Index"><span class="brand-mark"><partial name="_Icon" model='"brand"' /></span><span class="brand-name">MiniWorkflowEngine</span></a></header>
+        <main id="main-content" class="public-main" tabindex="-1">@RenderBody()</main>
+        <footer class="app-footer public-footer"><span>MiniWorkflowEngine</span><a asp-controller="Home" asp-action="Privacy">Gizlilik</a></footer>
+    }
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

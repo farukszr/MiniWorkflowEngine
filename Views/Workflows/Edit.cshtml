@@ -1,0 +1,42 @@
+@model MiniWorkflowEngine.ViewModels.WorkflowEditorViewModel
+@using MiniWorkflowEngine.ViewModels
+@{ var isNew = Model.Id == 0; ViewData["Title"] = isNew ? "Süreç oluştur" : "Taslağı düzenle"; }
+<section class="surface-card my-4">
+    <a asp-action="Index" class="small text-decoration-none">← Süreçlere dön</a>
+    <h1 class="h2 mt-4">@ViewData["Title"]</h1>
+    <p class="text-muted">v@(Model.Version) · Adımları aşağı/yukarı taşıyarak onay sırasını belirleyin.</p>
+    @if (isNew)
+    {
+        <p class="alert alert-info small">İlk süreç için <strong>Masraf onayı</strong> adını verip <strong>Onaylayıcı</strong> rolüne tek bir adım ekleyebilirsiniz. <strong>Taslağı kaydet</strong> düğmesinden sonra açılan sayfada <strong>Yayımla</strong> diyerek süreci talep formunda kullanıma açın.</p>
+    }
+    @if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+    <form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? (int?)null : Model.Id)" method="post" id="workflow-editor">
+        <input asp-for="Id" type="hidden" /><input asp-for="RowVersion" type="hidden" />
+        <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+        <div class="row g-3"><div class="col-md-4"><label asp-for="Code" class="form-label"></label><input asp-for="Code" class="form-control" readonly="@(!isNew)" placeholder="MASRAF_ONAYI" /><span asp-validation-for="Code" class="text-danger small"></span></div><div class="col-md-8"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" placeholder="Örn. Masraf onayı" /><span asp-validation-for="Name" class="text-danger small"></span></div></div>
+        <div class="my-3"><label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control" rows="2"></textarea></div>
+        <h2 class="h5 mt-4">Sıralı onay adımları</h2>
+        <p class="small text-muted">En fazla 20 adım, adım başına 10 koşul. Tutar: binlik ayırıcı olmadan en fazla iki ondalık basamak. Departman: yalnızca eşittir/eşit değildir.</p>
+        <div id="editor-notice" role="status" class="text-danger small mb-2" aria-live="polite"></div>
+        <div id="workflow-steps">
+        @for (var i = 0; i < Model.Steps.Count; i++)
+        {
+            var data = new ViewDataDictionary(ViewData) { ["Prefix"] = $"Steps[{i}]", ["Roles"] = Model.AvailableRoles };
+            <partial name="_StepFields" model="Model.Steps[i]" view-data="data" />
+        }
+        </div>
+        <button type="button" id="add-step" class="btn btn-outline-primary my-3">+ Onay adımı ekle</button>
+        <div class="d-flex flex-wrap gap-2 mt-3"><button class="btn btn-primary" type="submit">Taslağı kaydet</button><a asp-action="Index" class="btn btn-outline-secondary">Vazgeç</a>@if (!isNew) { <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-link">Sayfayı yenile</a> }</div>
+        <noscript><p class="text-muted mt-3">Adım veya koşul eklemek, kaldırmak ve sıralamak için JavaScript'i etkinleştirin. Mevcut alanlar yine kaydedilebilir.</p></noscript>
+    </form>
+    <template id="step-template">
+        @{ var stepData = new ViewDataDictionary(ViewData) { ["Prefix"] = "Steps[0]", ["Roles"] = Model.AvailableRoles }; }
+        <partial name="_StepFields" model="new WorkflowStepViewModel()" view-data="stepData" />
+    </template>
+    <template id="condition-template">
+        @{ var conditionData = new ViewDataDictionary(ViewData) { ["Prefix"] = "Steps[0].Conditions[0]" }; }
+        <partial name="_ConditionFields" model="new WorkflowConditionViewModel()" view-data="conditionData" />
+    </template>
+</section>
+@section Scripts { <script src="~/js/workflow-editor.js" asp-append-version="true"></script> }
+

@@ -1,0 +1,36 @@
+name: Build and integration checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Prepare SQL Server LocalDB
+        shell: pwsh
+        run: |
+          SqlLocalDB info MSSQLLocalDB
+          if ($LASTEXITCODE -ne 0) {
+            SqlLocalDB create MSSQLLocalDB
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          SqlLocalDB start MSSQLLocalDB
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: dotnet restore MiniWorkflowEngine.slnx
+      - run: dotnet tool restore
+      - run: dotnet build MiniWorkflowEngine.slnx --configuration Release --no-restore
+      - run: dotnet ef migrations has-pending-model-changes --project MiniWorkflowEngine.csproj --configuration Release --no-build
+      - run: dotnet run --project tests/MiniWorkflowEngine.IntegrationChecks --configuration Release --no-build --no-restore

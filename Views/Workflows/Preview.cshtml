@@ -1,0 +1,55 @@
+@model MiniWorkflowEngine.ViewModels.WorkflowPreviewInput
+@{
+    var preview = (MiniWorkflowEngine.ViewModels.WorkflowPreviewViewModel)ViewData["Preview"]!;
+    var firstStep = preview.Steps?.FirstOrDefault(step => step.Applies);
+    ViewData["Title"] = "Süreç önizleme";
+}
+<section class="my-4">
+    <a asp-action="Details" asp-route-id="@preview.Id" class="small text-decoration-none">← Süreç detayına dön</a>
+    <div class="page-heading mt-3">
+        <div><span class="eyebrow">@preview.Name · v@(preview.Version)</span><h1 class="h2 mt-2">Süreç önizleme</h1></div>
+    </div>
+    <div class="surface-card mt-4">
+        <p class="text-muted">Bu kayıtlı sürümün örnek bir talepte hangi adımları çalıştıracağını görün.</p>
+        <form asp-action="Preview" asp-route-id="@preview.Id" method="get">
+            <input type="hidden" name="evaluate" value="true" />
+            <div asp-validation-summary="All" class="validation-summary text-danger" role="alert"></div>
+            <div class="row g-3 align-items-end">
+                @if (preview.RequiresAmount)
+                {
+                    <div class="col-sm"><label asp-for="Amount" class="form-label"></label><input asp-for="Amount" class="form-control" inputmode="decimal" placeholder="9000" /></div>
+                }
+                @if (preview.RequiresDepartment)
+                {
+                    <div class="col-sm"><label asp-for="Department" class="form-label"></label><input asp-for="Department" class="form-control" /></div>
+                }
+                <div class="col-auto"><button class="btn btn-primary" type="submit">Önizle</button></div>
+            </div>
+        </form>
+    </div>
+    @if (preview.Steps is { } steps)
+    {
+        <section class="surface-card mt-4" aria-labelledby="preview-result">
+            <h2 class="h5" id="preview-result">Beklenen sonuç</h2>
+            @if (firstStep is null)
+            {
+                <p class="alert alert-info">Tüm adımlar atlanır. Talep otomatik onaylanır.</p>
+            }
+            else
+            {
+                <p class="alert alert-info">İlk karar <strong>@firstStep.Role</strong> rolünden beklenir.</p>
+            }
+            <ol class="workflow-preview">
+                @foreach (var step in steps)
+                {
+                    <li>
+                        <div class="d-flex flex-wrap justify-content-between gap-2">
+                            <div><strong>@step.Name</strong><span class="d-block small text-muted">@step.Role</span></div>
+                            <span class="request-status @(step.Applies ? "status-pending" : "status-neutral")">@(step.Applies ? "Onay beklenir" : "Atlanır")</span>
+                        </div>
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+</section>

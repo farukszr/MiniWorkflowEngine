@@ -1,0 +1,38 @@
+@model MiniWorkflowEngine.ViewModels.AdministrationHistoryViewModel
+@{ ViewData["Title"] = "Yönetim geçmişi"; }
+<section class="my-4">
+    <a asp-action="Index" class="small text-decoration-none">← Yönetime dön</a>
+    <div class="page-heading mt-3">
+        <div><span class="eyebrow">YÖNETİM / DENETİM</span><h1 class="h2 mt-2">Yönetim geçmişi</h1><p class="text-muted mb-0">Yönetim işlemlerini kimin ve ne zaman yaptığını inceleyin.</p></div>
+    </div>
+    <div class="surface-card mt-4">
+        @if (Model.Items.Count == 0)
+        {
+            <p class="text-muted mb-0">Bu sayfada yönetim kaydı yok.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle user-table">
+                    <thead><tr><th scope="col">Zaman (UTC)</th><th scope="col">Yönetici</th><th scope="col">İşlem</th><th scope="col">Hedef</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@item.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm:ss")</td><td>@item.Actor</td><td>@item.Operation</td>
+                            <td><span class="fw-semibold">@item.Target</span><span class="d-block small text-muted">@item.Detail</span></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (Model.Page > 1 || Model.HasNext)
+        {
+            <nav class="d-flex gap-2 mt-3" aria-label="Yönetim geçmişi sayfaları">
+                @if (Model.Page > 1) { <a asp-action="History" asp-route-page="@(Model.Page - 1)" class="btn btn-outline-secondary btn-sm">← Önceki</a> }
+                @if (Model.HasNext) { <a asp-action="History" asp-route-page="@(Model.Page + 1)" class="btn btn-outline-secondary btn-sm">Sonraki →</a> }
+            </nav>
+        }
+    </div>
+</section>

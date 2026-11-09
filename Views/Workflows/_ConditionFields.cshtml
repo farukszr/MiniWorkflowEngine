@@ -1,0 +1,9 @@
+@model MiniWorkflowEngine.ViewModels.WorkflowConditionViewModel
+@using MiniWorkflowEngine.Domain
+@using MiniWorkflowEngine.Domain.Enums
+<div class="condition-row">
+    <div><label class="form-label">Alan<select class="form-select" data-field="Field" name="@(ViewData["Prefix"]).Field">@foreach (var field in Enum.GetValues<ConditionField>()) { <option value="@((int)field)" selected="@(Model.Field == field)">@WorkflowLabels.Field(field)</option> }</select></label></div>
+    <div><label class="form-label">Karşılaştırma<select class="form-select" data-field="Operator" name="@(ViewData["Prefix"]).Operator">@foreach (var op in Enum.GetValues<ConditionOperator>()) { <option value="@((int)op)" selected="@(Model.Operator == op)">@WorkflowLabels.Operator(op)</option> }</select></label></div>
+    <div class="flex-grow-1"><label class="form-label">Değer<input class="form-control" data-field="Value" name="@(ViewData["Prefix"]).Value" value="@Model.Value" maxlength="250" required placeholder="Örn. 1000,50 veya Finans" /></label></div>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="remove-condition">Koşulu kaldır</button>
+</div>

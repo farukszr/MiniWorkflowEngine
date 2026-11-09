@@ -1,0 +1,14 @@
+@model MiniWorkflowEngine.ViewModels.EditUserRolesViewModel
+@{ ViewData["Title"] = "Rolleri düzenle"; }
+<section class="surface-card user-form my-4 mx-auto">
+    <a asp-action="Index" class="small text-decoration-none">← Kullanıcılara dön</a>
+    <h1 class="h2 mt-4">Rolleri düzenle</h1>
+    <p class="mb-1 fw-semibold">@Model.FullName</p><p class="text-muted">@Model.Email</p>
+    <div class="alert alert-light border small">Rol değişikliği kullanıcının diğer oturumlarını kapatır. Son yöneticinin yönetici rolü kaldırılamaz.</div>
+    <form asp-action="Roles" asp-route-id="@Model.Id" method="post">
+        <input asp-for="Id" type="hidden" /><input asp-for="ConcurrencyStamp" type="hidden" />
+        <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+        <partial name="_RolePicker" model="Model.Roles" />
+        <div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit">Rolleri kaydet</button><a asp-action="Roles" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Sayfayı yenile</a><a asp-action="Index" class="btn btn-link">Vazgeç</a></div>
+    </form>
+</section>
