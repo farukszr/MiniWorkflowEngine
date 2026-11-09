@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using MiniWorkflowEngine.Domain.Enums;
+using MiniWorkflowEngine.Domain;
 using MiniWorkflowEngine.Services.Workflow;
 
 namespace MiniWorkflowEngine.ViewModels;
@@ -27,6 +28,7 @@ public sealed class RequestEditorViewModel : IValidatableObject
     [StringLength(100, ErrorMessage = "Departman en fazla 100 karakter olabilir.")]
     [Display(Name = "Departman")]
     public string? Department { get; set; }
+    public Dictionary<string, string?> FormValues { get; set; } = new(StringComparer.Ordinal);
     [BindNever, ValidateNever] public List<RequestWorkflowChoice> Workflows { get; set; } = [];
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -37,12 +39,13 @@ public sealed class RequestEditorViewModel : IValidatableObject
     public RequestDraftInput ToInput()
     {
         if (!AmountInput.TryParse(Amount, out var value)) throw new InvalidOperationException("Talep tutarı doğrulanmadan kullanılamaz.");
-        return new(WorkflowDefinitionId, Title, Description, value, Department);
+        return new(WorkflowDefinitionId, Title, Description, value, Department, FormValues);
     }
 
 }
 
-public sealed record RequestWorkflowChoice(int Id, string Name, int Version, bool IsActive, bool RequiresAmount, bool RequiresDepartment);
+public sealed record RequestWorkflowChoice(int Id, string Name, int Version, bool IsActive, bool RequiresAmount, bool RequiresDepartment,
+    GraphField[] Fields);
 
 public sealed class RequestActionViewModel
 {

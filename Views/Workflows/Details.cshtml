@@ -6,13 +6,25 @@
     <div class="page-heading mt-3"><div><span class="eyebrow">@Model.Code · v@(Model.Version)</span><h1 class="h2 mt-2">@Model.Name</h1></div><span class="role-badge">@(Model.IsActive ? "Etkin" : Model.IsPublished ? "Arşiv" : "Taslak")</span></div>
     @if (TempData["Success"] is string success) { <div class="alert alert-success mt-3" role="status">@success</div> }
     @if (TempData["Error"] is string error) { <div class="alert alert-danger mt-3" role="alert">@error</div> }
+    @if (ViewData["UnstaffedSteps"] is string[] { Length: > 0 } unstaffed)
+    {
+        <div class="alert alert-warning mt-3" role="status">Şu adımlara uygun kullanıcı atanmadı: @string.Join(", ", unstaffed).</div>
+    }
     <div class="surface-card mt-4">
         <p class="text-muted workflow-description">@Model.Description</p>
         <div class="d-flex flex-wrap gap-2 mb-4">
-            <a asp-action="Preview" asp-route-id="@Model.Id" class="btn btn-outline-primary">Süreç önizleme</a>
+            @if (Model.IsGraph)
+            {
+                <a asp-action="Designer" asp-route-id="@Model.Id" class="btn btn-outline-primary">Görsel tasarımcıyı aç</a>
+                <a asp-action="GraphPreview" asp-route-id="@Model.Id" class="btn btn-outline-primary">Süreç önizleme</a>
+            }
+            else
+            {
+                <a asp-action="Preview" asp-route-id="@Model.Id" class="btn btn-outline-primary">Süreç önizleme</a>
+            }
             @if (Model.CanEdit)
             {
-                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Taslağı düzenle</a>
+                @if (!Model.IsGraph) { <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Taslağı düzenle</a> }
                 <form asp-action="Publish" asp-route-id="@Model.Id" method="post"><input type="hidden" name="Id" value="@Model.Id" /><input type="hidden" name="RowVersion" value="@Model.RowVersion" /><button class="btn btn-outline-primary">Yayımla</button></form>
             }
             else
@@ -25,7 +37,7 @@
             }
         </div>
         <p class="small text-muted">Yayımlama, aynı kodun önceki etkin sürümünü arşivler. Yayımlanmış sürüm değiştirilemez; mevcut talepler kendi sürümlerine bağlı kalır.</p>
-        <h2 class="h5 mt-4">Onay sırası</h2>
+        <h2 class="h5 mt-4">@(Model.IsGraph ? "Görev ve onay düğümleri" : "Onay sırası")</h2>
         <ol class="workflow-preview">
         @foreach (var step in Model.Steps)
         {

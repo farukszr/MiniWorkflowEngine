@@ -14,6 +14,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<WorkflowRequest> WorkflowRequests => Set<WorkflowRequest>();
     public DbSet<RequestAction> RequestActions => Set<RequestAction>();
     public DbSet<AdministrationEvent> AdministrationEvents => Set<AdministrationEvent>();
+    public DbSet<Department> Departments => Set<Department>();
 
     public void RecordAdministrationEvent(string actorId, string operation, string target, string? detail = null)
         => AdministrationEvents.Add(new AdministrationEvent { ActorId = actorId, Operation = operation, Target = target, Detail = detail });
@@ -42,6 +43,14 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        builder.Entity<Department>().Property(x => x.Name).HasMaxLength(100).IsRequired();
+        builder.Entity<Department>().HasIndex(x => x.Name).IsUnique();
+        builder.Entity<ApplicationUser>().HasOne(x => x.Department).WithMany().OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<WorkflowRequest>().HasOne(x => x.RequesterDepartment).WithMany().OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<WorkflowStep>().HasOne(x => x.Department).WithMany().OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<WorkflowStep>().HasOne(x => x.AssignedUser).WithMany().OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<WorkflowStep>().HasIndex(x => new { x.WorkflowDefinitionId, x.GraphNodeId })
+            .IsUnique().HasFilter("[GraphNodeId] IS NOT NULL");
         builder.Entity<AdministrationEvent>().HasOne(x => x.Actor).WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
     }
 }

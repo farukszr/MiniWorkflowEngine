@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,7 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
         var workflow = await db.WorkflowDefinitions.AsNoTracking().Include(x => x.Steps).ThenInclude(x => x.Conditions)
             .AsSplitQuery().SingleOrDefaultAsync(x => x.Id == id, ct);
         if (workflow is null) return null;
+        if (workflow.GraphJson is not null) return null;
 
         var orderedSteps = workflow.Steps.OrderBy(x => x.Order).ToArray();
         var required = WorkflowConditionEvaluator.RequiredInputs(orderedSteps);
@@ -75,10 +77,79 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
         var published = entity.PublishedAt != null || entity.IsActive || await db.WorkflowRequests.AnyAsync(x => x.WorkflowDefinitionId == id);
         return new WorkflowEditorViewModel { Id = entity.Id, Code = entity.Code, Name = entity.Name, Description = entity.Description,
             Version = entity.Version, RowVersion = Convert.ToBase64String(entity.RowVersion), CanEdit = !published,
-            IsActive = entity.IsActive, IsPublished = published, AvailableRoles = await RolesAsync(),
+            IsActive = entity.IsActive, IsPublished = published, IsGraph = entity.GraphJson is not null, AvailableRoles = await RolesAsync(),
             Steps = entity.Steps.OrderBy(x => x.Order).Select(x => new WorkflowStepViewModel { Name = x.Name, ApproverRoleId = x.ApproverRoleId,
                 Conditions = x.Conditions.OrderBy(c => c.Id).Select(c => new WorkflowConditionViewModel { Field = c.Field, Operator = c.Operator, Value = c.Value }).ToList() }).ToList() };
     }
+
+    public Task<GraphEditorViewModel?> GetGraphAsync(int id)
+        => db.WorkflowDefinitions.AsNoTracking().Where(x => x.Id == id && x.GraphJson != null)
+            .Select(x => new GraphEditorViewModel { Id = x.Id, Code = x.Code, Name = x.Name, Description = x.Description,
+                GraphJson = x.GraphJson!, RowVersion = Convert.ToBase64String(x.RowVersion) }).SingleOrDefaultAsync();
+
+    public async Task<string[]> UnstaffedAsync(int id)
+    {
+        var design = await db.WorkflowDefinitions.AsNoTracking().Where(x => x.Id == id).Select(x => x.GraphJson).SingleAsync();
+        if (WorkflowGraph.Read(design) is { } graph)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var members = await (from membership in db.UserRoles
+                join user in db.Users on membership.UserId equals user.Id
+                where user.LockoutEnd == null || user.LockoutEnd <= now
+                select new { membership.UserId, membership.RoleId, user.DepartmentId }).ToListAsync();
+            return graph.Nodes.Where(node => node.Kind is NodeKind.Task or NodeKind.Approval)
+                .Where(node => !members.Any(member => member.RoleId == node.RoleId &&
+                    (node.UserId is null || member.UserId == node.UserId) &&
+                    (node.DepartmentId is null || member.DepartmentId == node.DepartmentId)))
+                .Select(node => node.Name).ToArray();
+        }
+        return await db.WorkflowSteps.AsNoTracking().Where(step => step.WorkflowDefinitionId == id &&
+            !db.UserRoles.Any(member => member.RoleId == step.ApproverRoleId &&
+                (step.AssignedUserId == null || member.UserId == step.AssignedUserId) &&
+                db.Users.Any(user => user.Id == member.UserId &&
+                    (step.DepartmentId == null || user.DepartmentId == step.DepartmentId) &&
+                    (user.LockoutEnd == null || user.LockoutEnd <= DateTimeOffset.UtcNow))))
+            .OrderBy(x => x.Order).Select(x => x.Name).ToArrayAsync();
+    }
+
+    public Task<WorkflowOperationResult> SaveGraphAsync(GraphEditorViewModel model, string actorId)
+        => ExecuteAsync(actorId, async () =>
+        {
+            if (!Regex.IsMatch(model.Code, "^[A-Za-z][A-Za-z0-9_]{1,49}$") || model.Name.Trim().Length is < 2 or > 150 ||
+                model.Description?.Length > 2000 || model.GraphJson.Length > GraphRules.MaxDocumentLength)
+                return WorkflowOperationResult.Failure("Süreç kodu, adı veya belge boyutu geçersiz.");
+            WorkflowGraph? graph;
+            try { graph = WorkflowGraph.Read(model.GraphJson); }
+            catch (JsonException) { return WorkflowOperationResult.Failure("Tasarım belgesi okunamadı."); }
+            if (graph is null) return WorkflowOperationResult.Failure("Tasarım belgesi eksik.");
+            var error = GraphRules.Validate(graph, publishing: false);
+            if (error is not null) return WorkflowOperationResult.Failure(error);
+
+            var code = model.Code.ToUpperInvariant();
+            WorkflowDefinition entity;
+            if (model.Id == 0)
+            {
+                if (await db.WorkflowDefinitions.AnyAsync(x => x.Code == code))
+                    return WorkflowOperationResult.Failure("Bu süreç kodu zaten kullanımda.");
+                entity = new WorkflowDefinition { Code = code };
+                db.WorkflowDefinitions.Add(entity);
+            }
+            else
+            {
+                var existing = await db.WorkflowDefinitions.SingleOrDefaultAsync(x => x.Id == model.Id && x.GraphJson != null);
+                if (existing is null) return WorkflowOperationResult.Failure("Tasarım bulunamadı.");
+                if (!Matches(existing, model.RowVersion)) return Stale();
+                if (await IsFrozenAsync(existing)) return WorkflowOperationResult.Failure("Yayımlanan tasarım için yeni sürüm oluşturun.");
+                if (existing.Code != code) return WorkflowOperationResult.Failure("Süreç kodu değiştirilemez.");
+                entity = existing;
+            }
+            entity.Name = model.Name.Trim();
+            entity.Description = model.Description?.Trim();
+            entity.GraphJson = graph.Write();
+            if (entity.Id != 0) db.Entry(entity).Property(x => x.GraphJson).IsModified = true;
+            await db.SaveChangesAsync();
+            return WorkflowOperationResult.Success(entity.Id);
+        });
 
     public Task<WorkflowOperationResult> SaveAsync(WorkflowEditorViewModel model, string actorId)
         => ExecuteAsync(actorId, async () =>
@@ -98,6 +169,7 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
                 var existing = await db.WorkflowDefinitions.Include(x => x.Steps).ThenInclude(x => x.Conditions).SingleOrDefaultAsync(x => x.Id == model.Id);
                 if (existing is null) return WorkflowOperationResult.Failure("Süreç bulunamadı.");
                 entity = existing;
+                if (entity.GraphJson is not null) return WorkflowOperationResult.Failure("Bu taslağı görsel tasarımcıda düzenleyin.");
                 if (!Matches(entity, model.RowVersion)) return Stale();
                 if (await IsFrozenAsync(entity)) return WorkflowOperationResult.Failure("Yayımlanmış veya talepte kullanılmış süreç değiştirilemez. Yeni sürüm oluşturun.");
                 if (!string.Equals(entity.Code, model.Code.Trim(), StringComparison.OrdinalIgnoreCase)) return WorkflowOperationResult.Failure("Süreç kodu değiştirilemez.");
@@ -127,8 +199,23 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
             var validation = new WorkflowEditorViewModel { Code = entity.Code, Name = entity.Name, Description = entity.Description,
                 Steps = entity.Steps.OrderBy(x => x.Order).Select(x => new WorkflowStepViewModel { Name = x.Name, ApproverRoleId = x.ApproverRoleId,
                     Conditions = x.Conditions.Select(c => new WorkflowConditionViewModel { Field = c.Field, Operator = c.Operator, Value = c.Value }).ToList() }).ToList() };
-            var error = await ValidateAsync(validation);
+            var graph = WorkflowGraph.Read(entity.GraphJson);
+            var error = graph is null ? await ValidateAsync(validation) : GraphRules.Validate(graph, publishing: true);
             if (error is not null) return WorkflowOperationResult.Failure(error);
+            if (graph is not null)
+            {
+                var roles = (await RolesAsync()).Select(x => x.Value).ToHashSet();
+                foreach (var node in graph.Nodes.Where(n => n.Kind is NodeKind.Task or NodeKind.Approval))
+                {
+                    if (!roles.Contains(node.RoleId!) ||
+                        node.DepartmentId is { } department && !await db.Departments.AnyAsync(x => x.Id == department) ||
+                        node.UserId is { } user && !await db.UserRoles.AnyAsync(x => x.UserId == user && x.RoleId == node.RoleId &&
+                            db.Users.Any(u => u.Id == user && (node.DepartmentId == null || u.DepartmentId == node.DepartmentId))))
+                        return WorkflowOperationResult.Failure($"“{node.Name}” düğümünün rol, kullanıcı veya departman ataması geçersiz.");
+                    entity.Steps.Add(new WorkflowStep { GraphNodeId = node.Id, Name = node.Name.Trim(), Order = entity.Steps.Count + 1,
+                        ApproverRoleId = node.RoleId!, AssignedUserId = node.UserId, DepartmentId = node.DepartmentId });
+                }
+            }
             var previous = await db.WorkflowDefinitions.Where(x => x.Code == entity.Code && x.IsActive).ToListAsync();
             foreach (var old in previous) old.IsActive = false;
             await db.SaveChangesAsync();
@@ -163,8 +250,9 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
             if (await db.WorkflowDefinitions.AnyAsync(x => x.Code == source.Code && x.PublishedAt == null && !x.IsActive))
                 return WorkflowOperationResult.Failure("Bu sürecin bir taslağı zaten var. Süreç listesinden mevcut taslağı düzenleyin.");
             var maxVersion = await db.WorkflowDefinitions.Where(x => x.Code == source.Code).MaxAsync(x => x.Version);
-            var copy = new WorkflowDefinition { Code = source.Code, Name = source.Name, Description = source.Description, Version = checked(maxVersion + 1) };
-            foreach (var step in source.Steps.OrderBy(x => x.Order))
+            var copy = new WorkflowDefinition { Code = source.Code, Name = source.Name, Description = source.Description,
+                Version = checked(maxVersion + 1), GraphJson = source.GraphJson };
+            foreach (var step in source.Steps.Where(_ => source.GraphJson is null).OrderBy(x => x.Order))
                 copy.Steps.Add(new WorkflowStep { Name = step.Name, Order = step.Order, ApproverRoleId = step.ApproverRoleId,
                     Conditions = step.Conditions.Select(c => new StepCondition { Field = c.Field, Operator = c.Operator, Value = c.Value }).ToList() });
             db.WorkflowDefinitions.Add(copy);

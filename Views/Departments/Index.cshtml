@@ -1,0 +1,44 @@
+@model MiniWorkflowEngine.ViewModels.DepartmentsViewModel
+@{ ViewData["Title"] = "Departmanlar"; }
+<section class="my-4">
+    <div class="page-heading"><div><span class="eyebrow">YÖNETİM / ORGANİZASYON</span><h1 class="h2 mt-2">Departmanlar</h1>
+        <p class="text-muted mb-0">Departmanları ve kullanıcı üyeliklerini düzenleyin.</p></div></div>
+    @if (TempData["Success"] is string success) { <p class="alert alert-success mt-3" role="status">@success</p> }
+    @if (TempData["Error"] is string error) { <p class="alert alert-danger mt-3" role="alert">@error</p> }
+    <div class="surface-card mt-4">
+        <h2 class="h5">Departman yönetimi</h2>
+        <form asp-action="Save" method="post" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+            <label class="form-label mb-0">Yeni departman adı<input class="form-control" name="name" required minlength="2" maxlength="100" /></label>
+            <button class="btn btn-primary">Departman ekle</button>
+        </form>
+        @foreach (var item in Model.Departments)
+        {
+            <form asp-action="Save" asp-route-id="@item.Id" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                <label class="form-label mb-0">@item.MemberCount üye<input class="form-control" aria-label="@item.Name departman adı" name="name" value="@item.Name" required minlength="2" maxlength="100" /></label>
+                <button class="btn btn-outline-primary">Adı güncelle</button>
+            </form>
+        }
+    </div>
+    <div class="surface-card mt-4">
+        <h2 class="h5">Kullanıcı üyelikleri</h2>
+        <div class="table-responsive">
+            <table class="table align-middle user-table">
+                <thead><tr><th scope="col">Kullanıcı</th><th scope="col">Departman</th></tr></thead>
+                <tbody>
+                @foreach (var member in Model.Members)
+                {
+                    <tr><td><strong>@member.Name</strong><span class="d-block small text-muted">@member.Email</span></td>
+                        <td><form asp-action="Assign" method="post" class="d-flex flex-wrap gap-2">
+                            <input type="hidden" name="userId" value="@member.Id" />
+                            <select name="departmentId" aria-label="@member.Name için departman" class="form-select w-auto">
+                                <option value="">Departman yok</option>
+                                @foreach (var option in Model.DepartmentOptions) { <option value="@option.Value" selected="@(option.Value == member.DepartmentId?.ToString())">@option.Text</option> }
+                            </select>
+                            <button class="btn btn-outline-primary">Üyeliği kaydet</button>
+                        </form></td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

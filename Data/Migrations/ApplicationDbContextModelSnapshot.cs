@@ -206,6 +206,9 @@ namespace MiniWorkflowEngine.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -253,6 +256,8 @@ namespace MiniWorkflowEngine.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartmentId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -262,6 +267,27 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("MiniWorkflowEngine.Domain.Entities.Department", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("MiniWorkflowEngine.Domain.Entities.RequestAction", b =>
@@ -363,6 +389,9 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("GraphJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -428,6 +457,12 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<string>("FormValuesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("RequesterDepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("RequesterId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -452,6 +487,8 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RequesterDepartmentId");
 
                     b.HasIndex("WorkflowDefinitionId");
 
@@ -481,6 +518,15 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("AssignedUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("GraphNodeId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -495,6 +541,14 @@ namespace MiniWorkflowEngine.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApproverRoleId");
+
+                    b.HasIndex("AssignedUserId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("WorkflowDefinitionId", "GraphNodeId")
+                        .IsUnique()
+                        .HasFilter("[GraphNodeId] IS NOT NULL");
 
                     b.HasIndex("WorkflowDefinitionId", "Order")
                         .IsUnique();
@@ -567,6 +621,16 @@ namespace MiniWorkflowEngine.Data.Migrations
                     b.Navigation("Actor");
                 });
 
+            modelBuilder.Entity("MiniWorkflowEngine.Domain.Entities.ApplicationUser", b =>
+                {
+                    b.HasOne("MiniWorkflowEngine.Domain.Entities.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("MiniWorkflowEngine.Domain.Entities.RequestAction", b =>
                 {
                     b.HasOne("MiniWorkflowEngine.Domain.Entities.ApplicationUser", "Actor")
@@ -608,6 +672,11 @@ namespace MiniWorkflowEngine.Data.Migrations
 
             modelBuilder.Entity("MiniWorkflowEngine.Domain.Entities.WorkflowRequest", b =>
                 {
+                    b.HasOne("MiniWorkflowEngine.Domain.Entities.Department", "RequesterDepartment")
+                        .WithMany()
+                        .HasForeignKey("RequesterDepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("MiniWorkflowEngine.Domain.Entities.ApplicationUser", "Requester")
                         .WithMany()
                         .HasForeignKey("RequesterId")
@@ -630,6 +699,8 @@ namespace MiniWorkflowEngine.Data.Migrations
 
                     b.Navigation("Requester");
 
+                    b.Navigation("RequesterDepartment");
+
                     b.Navigation("WorkflowDefinition");
                 });
 
@@ -641,6 +712,16 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("MiniWorkflowEngine.Domain.Entities.ApplicationUser", "AssignedUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("MiniWorkflowEngine.Domain.Entities.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("MiniWorkflowEngine.Domain.Entities.WorkflowDefinition", "WorkflowDefinition")
                         .WithMany("Steps")
                         .HasForeignKey("WorkflowDefinitionId")
@@ -648,6 +729,10 @@ namespace MiniWorkflowEngine.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ApproverRole");
+
+                    b.Navigation("AssignedUser");
+
+                    b.Navigation("Department");
 
                     b.Navigation("WorkflowDefinition");
                 });

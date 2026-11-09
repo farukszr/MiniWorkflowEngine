@@ -1,8 +1,8 @@
 # MiniWorkflowEngine
 
-ASP.NET Core MVC ile geliştirilmiş, çalışan bir kurumsal iş akışı yönetimi
-portföy projesi. Süreç tanımları veritabanında tutulur; talepler sürümlü tanımlara
-bağlanır ve rol/koşul tabanlı sıralı onaydan geçer.
+ASP.NET Core MVC ile geliştirilmiş bir Low-Code iş akışı uygulaması.
+Yönetici süreç ve form tasarlar. Çalışan yayımlanan formdan talep gönderir.
+Görevli, atandığı adımı tamamlar, onaylar, reddeder veya düzeltme için iade eder.
 
 Low-Code / BPM / Workflow Developer rollerinde süreç modelleme, iş kuralları,
 yetkilendirme ve veri tutarlılığı becerilerini göstermek için hazırlanmıştır.
@@ -76,6 +76,11 @@ gösterir. [Giriş ekranını aç](https://localhost:7062/Account/Login)
 
 ## Özellikler
 
+- **Süreç tanımları → Görsel süreç oluştur** ile başlangıç, kullanıcı görevi, onay, karar ve bitiş düğümlerini bağlama.
+- Aynı tasarım ekranında dinamik form alanları oluşturma ve bu alanları karar değişkeni olarak kullanma.
+- Süreç detayındaki **Süreç önizleme** ile örnek değerlerden ilk görevi veya bitişi görme.
+- **Departmanlar** üzerinden birim oluşturma ve kullanıcı üyeliği atama. Görevleri role, departmana ve kişiye göre sınırlandırma.
+- **Raporlar** üzerinden süreç, departman, tarih ve durum bazında talep sayısı, gecikme ve ortalama kapanış süresi.
 - Dinamik ve sürümlü süreç tanımları; taslak, yayımlama ve arşivleme.
 - Sıralı onay adımları; tutar/departman koşulları ve otomatik adım atlama.
 - Kayıtlı süreç sürümünde örnek tutar ve departmanla önizleme.
@@ -90,6 +95,13 @@ gösterir. [Giriş ekranını aç](https://localhost:7062/Account/Login)
 - Kendi talebine karar engeli, CSRF, hesap kilidi ve güvenli oturum.
 - Eski form/çift karar koruması; durum ve geçmişi birlikte kaydeden transaction.
 - Türkçe, responsive Razor arayüzü.
+
+### Görsel bir süreç yayımlama
+
+1. Başlangıçtan sonraki düğüme **İlerle** bağlantısı ekleyin. Kullanıcı görevinde rol seçin ve **Tamamla** çıkışını bağlayın.
+2. Bir onay düğümünde **Onay** ve **Ret** bağlantılarını oluşturun. **Ret** bağlantısını sonucu **Reddedildi** olan bir bitiş düğümüne bağlayın.
+3. Karar düğümünde bir **Koşul sağlanırsa** ve bir **Varsayılan yol** bağlantısı tanımlayın. Örneğin form tasarımcısında oluşturduğunuz `oncelik` alanını karar değişkeni olarak seçin.
+4. **Taslağı kaydet → Süreç önizleme → Yayımla** adımlarını izleyin. Çalışan yayımlanan süreci **Talep oluştur** ekranında seçebilir.
 
 ## Teknolojiler
 

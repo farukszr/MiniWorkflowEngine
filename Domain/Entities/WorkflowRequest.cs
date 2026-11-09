@@ -13,6 +13,9 @@ public sealed class WorkflowRequest
     public string Description { get; set; } = string.Empty;
     public decimal? Amount { get; set; }
     public string? Department { get; set; }
+    public string? FormValuesJson { get; set; }
+    public int? RequesterDepartmentId { get; set; }
+    public Department? RequesterDepartment { get; set; }
     public RequestStatus Status { get; set; } = RequestStatus.Draft;
     public int? CurrentStepId { get; set; }
     public WorkflowStep? CurrentStep { get; set; }

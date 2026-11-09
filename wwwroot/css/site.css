@@ -105,6 +105,26 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 
 /* Forms, tables and status */
 .surface-card { min-width: 0; padding: clamp(1.15rem, 3vw, 2rem); background: var(--paper); border: 1px solid var(--line); border-radius: 1rem; box-shadow: var(--shadow); }
+.graph-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(13rem, 17rem); gap: 1rem; }
+.graph-viewport { min-width: 0; height: clamp(20rem, 52vh, 37rem); overflow: auto; border: 1px solid var(--line); border-radius: .75rem; background: #f7f9f5; }
+.graph-canvas { position: relative; overflow: hidden; background-image: radial-gradient(#b5c8bb 1px, transparent 1px); background-size: 18px 18px; }
+.graph-lines, #graph-nodes { position: absolute; inset: 0; }
+.graph-lines { width: 100%; height: 100%; pointer-events: none; }
+.graph-lines > path { fill: none; stroke: #537564; stroke-width: 2; }
+.graph-lines marker { fill: #537564; }
+#graph-nodes { transform-origin: top left; }
+.graph-node { position: absolute; display: grid; align-content: center; text-align: left; width: 170px; height: 60px; padding: .35rem .65rem; border: 1px solid #a7bdb0; border-radius: .55rem; background: white; color: var(--forest-dark); box-shadow: var(--shadow); touch-action: none; }
+.graph-node strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graph-node small { color: var(--muted); }
+.graph-node[data-kind="start"], .graph-node[data-kind="end"] { background: var(--mint); }
+.graph-node[data-kind="decision"] { background: var(--gold); }
+.graph-node[aria-pressed="true"] { outline: 2px solid var(--forest); outline-offset: 2px; }
+.graph-inspector { padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; }
+.graph-routes li + li { margin-top: .4rem; }
+.graph-fields { display: grid; gap: .6rem; min-height: 3rem; padding: .65rem; border: 1px dashed #a7bdb0; border-radius: .65rem; }
+.graph-field { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem .7rem; padding: .8rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--canvas); }
+.graph-field > strong, .graph-field > div { grid-column: 1 / -1; }
+@media (max-width: 760px) { .graph-workspace, .graph-field { grid-template-columns: minmax(0, 1fr); } }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .page-heading h1 { font-size: clamp(1.75rem, 3.25vw, 2.6rem); }
 .form-control, .form-select { min-height: 2.7rem; padding: .65rem .75rem; background-color: #fff; border-color: #cddbd2; border-radius: .55rem; }

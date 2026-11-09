@@ -10,6 +10,7 @@ public sealed class WorkflowDefinition
     public bool IsActive { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? GraphJson { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public ICollection<WorkflowStep> Steps { get; set; } = new List<WorkflowStep>();
 }

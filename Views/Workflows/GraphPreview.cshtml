@@ -1,0 +1,29 @@
+@model MiniWorkflowEngine.ViewModels.GraphPreviewViewModel
+@{ ViewData["Title"] = "Süreç önizleme"; }
+<section class="my-4">
+    <a asp-action="Details" asp-route-id="@Model.Id" class="small text-decoration-none">← Süreç detayına dön</a>
+    <h1 class="h2 mt-3">Süreç önizleme</h1>
+    <div class="surface-card mt-3">
+        <h2 class="h5">@Model.Name</h2>
+        <p class="text-muted">Örnek değerlerle başlangıçtan ilk insan görevine veya bitişe kadar yolu kontrol edin.</p>
+        <form asp-action="GraphPreview" asp-route-id="@Model.Id" method="post">
+            <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6"><label asp-for="Amount" class="form-label"></label><input asp-for="Amount" class="form-control" inputmode="decimal" /></div>
+                <div class="col-md-6"><label asp-for="Department" class="form-label"></label><input asp-for="Department" class="form-control" /></div>
+            </div>
+            <partial name="_GraphFormFields" model='("preview", Model.Fields, (IReadOnlyDictionary<string, string?>)Model.FormValues)' />
+            <button class="btn btn-primary">Önizle</button>
+        </form>
+    </div>
+    @if (Model.Result is not null)
+    {
+        <div class="surface-card mt-3" role="status">
+            <h2 class="h5">@Model.Result</h2>
+            @if (Model.Route.Count > 0)
+            {
+                <ol class="mb-0">@foreach (var step in Model.Route) { <li>@step</li> }</ol>
+            }
+        </div>
+    }
+</section>

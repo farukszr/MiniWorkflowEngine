@@ -13,7 +13,11 @@ public sealed class RequestQueryService(ApplicationDbContext db)
     private IQueryable<WorkflowRequest> PendingFor(string actorId)
         => ApprovalAccess.PendingFor(db, actorId).AsNoTracking();
 
-    public Task<int> PendingCountAsync(string actorId, CancellationToken ct) => PendingFor(actorId).CountAsync(ct);
+    private IQueryable<WorkflowRequest> InboxFor(string actorId)
+        => PendingFor(actorId).Union(db.WorkflowRequests.AsNoTracking()
+            .Where(x => x.RequesterId == actorId && x.Status == RequestStatus.Returned));
+
+    public Task<int> PendingCountAsync(string actorId, CancellationToken ct) => InboxFor(actorId).CountAsync(ct);
 
     public async Task<RequestListViewModel> ListAsync(string actorId, RequestListScope scope, string? search, RequestStatus? status, int page, CancellationToken ct, bool overdue = false)
     {
@@ -23,7 +27,7 @@ public sealed class RequestQueryService(ApplicationDbContext db)
         var requests = db.WorkflowRequests.AsNoTracking();
         var query = scope switch
         {
-            RequestListScope.Inbox => PendingFor(actorId),
+            RequestListScope.Inbox => InboxFor(actorId),
             RequestListScope.All => requests,
             _ => requests.Where(x => x.RequesterId == actorId)
         };
@@ -32,9 +36,13 @@ public sealed class RequestQueryService(ApplicationDbContext db)
         var rows = query.Select(x => new
         {
             Request = x,
-            WaitingSince = x.Status == RequestStatus.Pending
+            WaitingSince = x.Status == RequestStatus.Returned
+                ? x.Actions.Where(a => a.ActionType == RequestActionType.Returned).OrderByDescending(a => a.Id)
+                    .Select(a => (DateTimeOffset?)a.CreatedAt).FirstOrDefault() ?? x.CreatedAt
+                : x.Status == RequestStatus.Pending
                 ? x.Actions.Where(a => a.ActionType == RequestActionType.Submitted || a.ActionType == RequestActionType.Approved ||
-                        a.ActionType == RequestActionType.AdministratorApproved)
+                        a.ActionType == RequestActionType.AdministratorApproved || a.ActionType == RequestActionType.TaskCompleted ||
+                        a.ActionType == RequestActionType.Resubmitted)
                     .OrderByDescending(a => a.Id).Select(a => (DateTimeOffset?)a.CreatedAt).FirstOrDefault() ?? x.CreatedAt
                 : (DateTimeOffset?)null
         });
@@ -54,12 +62,14 @@ public sealed class RequestQueryService(ApplicationDbContext db)
             Overdue = overdue, Page = page, TotalPages = pages, TotalCount = count, Items = items };
     }
 
-    public Task<List<RequestWorkflowChoice>> WorkflowsAsync(int? includeId, CancellationToken ct)
-        => db.WorkflowDefinitions.AsNoTracking().Where(x => (x.IsActive && x.PublishedAt != null) || x.Id == includeId)
+    public async Task<List<RequestWorkflowChoice>> WorkflowsAsync(int? includeId, CancellationToken ct)
+        => (await db.WorkflowDefinitions.AsNoTracking().Where(x => (x.IsActive && x.PublishedAt != null) || x.Id == includeId)
             .OrderBy(x => x.Name).ThenByDescending(x => x.Version)
-            .Select(x => new RequestWorkflowChoice(x.Id, x.Name, x.Version, x.IsActive,
-                x.Steps.Any(s => s.Conditions.Any(c => c.Field == ConditionField.Amount)),
-                x.Steps.Any(s => s.Conditions.Any(c => c.Field == ConditionField.Department)))).ToListAsync(ct);
+            .Select(x => new { x.Id, x.Name, x.Version, x.IsActive, x.GraphJson,
+                RequiresAmount = x.Steps.Any(s => s.Conditions.Any(c => c.Field == ConditionField.Amount)),
+                RequiresDepartment = x.Steps.Any(s => s.Conditions.Any(c => c.Field == ConditionField.Department)) }).ToListAsync(ct))
+            .Select(x => new RequestWorkflowChoice(x.Id, x.Name, x.Version, x.IsActive, x.RequiresAmount, x.RequiresDepartment,
+                WorkflowGraph.Read(x.GraphJson)?.Fields ?? [])).ToList();
 
     public async Task<RequestDetailsViewModel> DetailsAsync(RequestSnapshot request, string actorId, CancellationToken ct)
     {
@@ -70,13 +80,16 @@ public sealed class RequestQueryService(ApplicationDbContext db)
             await PendingFor(actorId).AnyAsync(x => x.Id == request.Id, ct);
         var administrative = eligible && !assigned && await ApprovalAccess.IsAdministratorAsync(db, actorId, ct);
         var requesterName = await db.Users.Where(x => x.Id == request.RequesterId).Select(x => x.FullName).SingleAsync(ct);
-        return new RequestDetailsViewModel { Request = request, RequesterName = requesterName, CanEdit = isOwner && request.Status == RequestStatus.Draft,
-            CanSubmit = isOwner && request.Status == RequestStatus.Draft && active, IsWorkflowActive = active,
-            CanCancel = isOwner && request.Status is RequestStatus.Draft or RequestStatus.Pending,
+        return new RequestDetailsViewModel { Request = request, RequesterName = requesterName,
+            CanEdit = isOwner && request.Status is RequestStatus.Draft or RequestStatus.Returned,
+            CanSubmit = isOwner && (request.Status == RequestStatus.Returned || request.Status == RequestStatus.Draft && active), IsWorkflowActive = active,
+            CanCancel = isOwner && request.Status is RequestStatus.Draft or RequestStatus.Pending or RequestStatus.Returned,
             CanDecide = assigned || administrative, IsAdministrativeDecision = administrative,
-            WaitingSince = request.Status == RequestStatus.Pending
+            WaitingSince = request.Status == RequestStatus.Returned
+                ? request.History.LastOrDefault(x => x.ActionType == RequestActionType.Returned)?.CreatedAt ?? request.CreatedAt
+                : request.Status == RequestStatus.Pending
                 ? request.History.LastOrDefault(x => x.ActionType is RequestActionType.Submitted or RequestActionType.Approved
-                    or RequestActionType.AdministratorApproved)?.CreatedAt ?? request.CreatedAt
+                    or RequestActionType.AdministratorApproved or RequestActionType.TaskCompleted or RequestActionType.Resubmitted)?.CreatedAt ?? request.CreatedAt
                 : null };
     }
 }

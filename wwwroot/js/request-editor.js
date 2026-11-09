@@ -5,6 +5,9 @@
     if (!select || !help) return;
     const update = () => {
         const option = select.selectedOptions[0];
+        document.querySelectorAll('[data-request-fields]').forEach(group => {
+            group.hidden = group.disabled = group.dataset.requestFields !== option?.value;
+        });
         if (!option || option.value === '0') { help.textContent = 'Gönderim gereksinimlerini görmek için bir süreç seçin.'; return; }
         const fields = [];
         if (option?.dataset.amount === 'true') fields.push('tutar');

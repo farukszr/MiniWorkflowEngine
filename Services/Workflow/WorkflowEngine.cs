@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MiniWorkflowEngine.Data;
@@ -20,7 +21,10 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
             var definition = await db.WorkflowDefinitions.SingleOrDefaultAsync(x => x.Id == input.WorkflowDefinitionId, ct);
             if (definition is null || !definition.IsActive || definition.PublishedAt is null)
                 return Fail(WorkflowError.InvalidState, "Yeni talep için etkin ve yayımlanmış bir süreç seçin.");
-            var request = new WorkflowRequest { WorkflowDefinitionId = definition.Id, RequesterId = actor.Id };
+            var request = new WorkflowRequest { WorkflowDefinitionId = definition.Id, RequesterId = actor.Id,
+                RequesterDepartmentId = actor.DepartmentId };
+            error = SaveFormValues(request, definition.GraphJson, input.FormValues, submitting: false);
+            if (error is not null) return Fail(WorkflowError.Validation, error);
             ApplyInput(request, input);
             db.WorkflowRequests.Add(request);
             AddAction(request, actor.Id, RequestActionType.DraftCreated);
@@ -31,9 +35,12 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
         => MutateAsync(command, actorId, async (db, request, actor, ct) =>
         {
             if (request.RequesterId != actor.Id) return OwnerOnly();
-            if (request.Status != RequestStatus.Draft) return Fail(WorkflowError.InvalidState, "Yalnızca taslak talep düzenlenebilir.");
+            if (request.Status is not (RequestStatus.Draft or RequestStatus.Returned))
+                return Fail(WorkflowError.InvalidState, "Yalnızca taslak veya iade edilmiş talep düzenlenebilir.");
             if (request.WorkflowDefinitionId != input.WorkflowDefinitionId) return Fail(WorkflowError.Validation, "Talebin süreç sürümü değiştirilemez.");
             var error = ValidateInput(input);
+            if (error is not null) return Fail(WorkflowError.Validation, error);
+            error = SaveFormValues(request, request.WorkflowDefinition.GraphJson, input.FormValues, submitting: false);
             if (error is not null) return Fail(WorkflowError.Validation, error);
             ApplyInput(request, input);
             // Aynı alanlar tekrar gönderilse de sürüm ve işlem geçmişi birlikte ilerler.
@@ -46,11 +53,23 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
         => MutateAsync(command, actorId, async (db, request, actor, ct) =>
         {
             if (request.RequesterId != actor.Id) return OwnerOnly();
-            if (request.Status != RequestStatus.Draft) return Fail(WorkflowError.InvalidState, "Yalnızca taslak talep gönderilebilir.");
-            if (!request.WorkflowDefinition.IsActive || request.WorkflowDefinition.PublishedAt is null)
+            if (request.Status is not (RequestStatus.Draft or RequestStatus.Returned))
+                return Fail(WorkflowError.InvalidState, "Yalnızca taslak veya iade edilmiş talep gönderilebilir.");
+            if (request.Status == RequestStatus.Draft && (!request.WorkflowDefinition.IsActive || request.WorkflowDefinition.PublishedAt is null))
                 return Fail(WorkflowError.InvalidState, "Taslağın süreç sürümü artık etkin değil. Etkin sürümle yeni talep oluşturun.");
             var error = ValidateInput(new RequestDraftInput(request.WorkflowDefinitionId, request.Title, request.Description, request.Amount, request.Department));
             if (error is not null) return Fail(WorkflowError.Validation, error);
+            if (WorkflowGraph.Read(request.WorkflowDefinition.GraphJson) is { } graph)
+            {
+                error = SaveFormValues(request, request.WorkflowDefinition.GraphJson, GraphRuntime.ReadValues(request.FormValuesJson), submitting: true);
+                if (error is not null) return Fail(WorkflowError.Validation, error);
+                var returned = request.Status == RequestStatus.Returned;
+                request.Status = RequestStatus.Pending;
+                AddAction(request, actor.Id, returned ? RequestActionType.Resubmitted : RequestActionType.Submitted,
+                    returned ? request.CurrentStepId : null, command.Comment?.Trim());
+                if (!returned) MoveGraph(request, actor.Id, graph, graph.Nodes.Single(n => n.Kind == NodeKind.Start).Id, RouteKind.Next);
+                return await SaveAsync(db, request, ct);
+            }
             var applicability = await EvaluateStepsAsync(db, request, ct);
             var requiredInputs = WorkflowConditionEvaluator.RequiredInputs(request.WorkflowDefinition.Steps);
             if (requiredInputs.Amount && request.Amount is null)
@@ -69,11 +88,17 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
     public Task<WorkflowResult> RejectAsync(RequestCommand command, string actorId, CancellationToken cancellationToken = default)
         => DecideAsync(command, actorId, approve: false, cancellationToken);
 
+    public Task<WorkflowResult> CompleteTaskAsync(RequestCommand command, string actorId, CancellationToken cancellationToken = default)
+        => GraphTaskAsync(command, actorId, returning: false, cancellationToken);
+
+    public Task<WorkflowResult> ReturnAsync(RequestCommand command, string actorId, CancellationToken cancellationToken = default)
+        => GraphTaskAsync(command, actorId, returning: true, cancellationToken);
+
     public Task<WorkflowResult> CancelAsync(RequestCommand command, string actorId, CancellationToken cancellationToken = default)
         => MutateAsync(command, actorId, async (db, request, actor, ct) =>
         {
             if (request.RequesterId != actor.Id) return OwnerOnly();
-            if (request.Status is not (RequestStatus.Draft or RequestStatus.Pending)) return FinalState();
+            if (request.Status is not (RequestStatus.Draft or RequestStatus.Pending or RequestStatus.Returned)) return FinalState();
             AddAction(request, actor.Id, RequestActionType.Cancelled, request.CurrentStepId, command.Comment?.Trim());
             Finish(request, RequestStatus.Cancelled);
             return await SaveAsync(db, request, ct);
@@ -99,7 +124,9 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
             if (!assigned && !await ApprovalAccess.IsAdministratorAsync(db, actor.Id, ct))
                 return Fail(WorkflowError.Forbidden, "Bu adım için onay yetkiniz bulunmuyor.");
             if (!approve && string.IsNullOrWhiteSpace(command.Comment)) return Fail(WorkflowError.Validation, "Ret gerekçesi girin.");
-            var applicability = await EvaluateStepsAsync(db, request, ct);
+            var graph = WorkflowGraph.Read(request.WorkflowDefinition.GraphJson);
+            if (graph is not null && graph.Nodes.Single(n => n.Id == current.GraphNodeId).Kind != NodeKind.Approval)
+                return Fail(WorkflowError.InvalidState, "Bu adım bir onay adımı değil. Görev tamamlama işlemini kullanın.");
             var decision = (assigned, approve) switch
             {
                 (true, true) => RequestActionType.Approved,
@@ -110,10 +137,60 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
             AddAction(request, actor.Id, decision, current.Id, command.Comment?.Trim());
             if (!assigned)
                 db.RecordAdministrationEvent(actor.Id, RequestLabels.Action(decision), $"Talep #{request.Id} · {request.Title}", current.Name);
-            if (approve) MoveNext(request, actor.Id, current.Order, applicability);
-            else Finish(request, RequestStatus.Rejected);
+            if (graph is not null) MoveGraph(request, actor.Id, graph, current.GraphNodeId!.Value, approve ? RouteKind.Approve : RouteKind.Reject);
+            else if (approve) MoveNext(request, actor.Id, current.Order, await EvaluateStepsAsync(db, request, ct));
+            else
+            {
+                await EvaluateStepsAsync(db, request, ct);
+                Finish(request, RequestStatus.Rejected);
+            }
             return await SaveAsync(db, request, ct);
         }, cancellationToken);
+
+    private Task<WorkflowResult> GraphTaskAsync(RequestCommand command, string actorId, bool returning, CancellationToken cancellationToken)
+        => MutateAsync(command, actorId, async (db, request, actor, ct) =>
+        {
+            if (request.Status != RequestStatus.Pending || WorkflowGraph.Read(request.WorkflowDefinition.GraphJson) is not { } graph)
+                return FinalState();
+            if (request.RequesterId == actor.Id) return OwnerOnly();
+            var assigned = await ApprovalAccess.PendingFor(db, actor.Id).AnyAsync(x => x.Id == request.Id, ct);
+            if (!assigned && !await ApprovalAccess.IsAdministratorAsync(db, actor.Id, ct))
+                return Fail(WorkflowError.Forbidden, "Bu görev için yetkiniz bulunmuyor.");
+            var step = request.WorkflowDefinition.Steps.Single(s => s.Id == request.CurrentStepId);
+            var node = graph.Nodes.Single(n => n.Id == step.GraphNodeId);
+            if (returning && !node.AllowReturn || !returning && node.Kind != NodeKind.Task) return FinalState();
+            if (returning && string.IsNullOrWhiteSpace(command.Comment))
+                return Fail(WorkflowError.Validation, "İade gerekçesi girin.");
+            var action = returning ? RequestActionType.Returned : RequestActionType.TaskCompleted;
+            AddAction(request, actor.Id, action, step.Id, command.Comment?.Trim());
+            if (!assigned) db.RecordAdministrationEvent(actor.Id, RequestLabels.Action(action), $"Talep #{request.Id} · {request.Title}", node.Name);
+            if (returning) request.Status = RequestStatus.Returned;
+            else MoveGraph(request, actor.Id, graph, node.Id, RouteKind.Complete);
+            return await SaveAsync(db, request, ct);
+        }, cancellationToken);
+
+    private static string? SaveFormValues(WorkflowRequest request, string? graphJson,
+        IReadOnlyDictionary<string, string?>? values, bool submitting)
+    {
+        if (WorkflowGraph.Read(graphJson) is not { } graph)
+            return values is { Count: > 0 } ? "Bu süreç ek form alanı içermiyor." : null;
+        var error = GraphRuntime.ValidateValues(graph, values ?? new Dictionary<string, string?>(), submitting, out var normalized);
+        if (error is null) request.FormValuesJson = JsonSerializer.Serialize(normalized);
+        return error;
+    }
+
+    private static void MoveGraph(WorkflowRequest request, string actorId, WorkflowGraph graph, Guid from, RouteKind route)
+    {
+        var node = GraphRuntime.Follow(graph, request, from, route,
+            label => AddAction(request, actorId, RequestActionType.RouteSelected, comment: label));
+        if (node.Kind == NodeKind.End)
+        {
+            Finish(request, node.Outcome == EndOutcome.Rejected ? RequestStatus.Rejected : RequestStatus.Approved);
+            AddAction(request, actorId, RequestActionType.Completed, comment: node.Name);
+            return;
+        }
+        request.CurrentStepId = request.WorkflowDefinition.Steps.Single(s => s.GraphNodeId == node.Id).Id;
+    }
 
     private Task<WorkflowResult> MutateAsync(RequestCommand command, string actorId,
         Func<ApplicationDbContext, WorkflowRequest, ApplicationUser, CancellationToken, Task<WorkflowResult>> action, CancellationToken cancellationToken)
@@ -196,13 +273,15 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
     private static async Task<RequestSnapshot> SnapshotAsync(ApplicationDbContext db, WorkflowRequest request, CancellationToken ct)
     {
         var definition = await db.WorkflowDefinitions.AsNoTracking().SingleAsync(x => x.Id == request.WorkflowDefinitionId, ct);
-        var currentName = request.CurrentStepId is null ? null : await db.WorkflowSteps.Where(x => x.Id == request.CurrentStepId).Select(x => x.Name).SingleAsync(ct);
+        var current = request.CurrentStepId is null ? null : await db.WorkflowSteps.Where(x => x.Id == request.CurrentStepId)
+            .Select(x => new { x.Name, x.GraphNodeId }).SingleAsync(ct);
         var history = await db.RequestActions.AsNoTracking().Where(x => x.WorkflowRequestId == request.Id).OrderBy(x => x.Id)
             .Select(x => new RequestHistoryItem(x.Id, x.WorkflowStepId, x.WorkflowStep == null ? null : x.WorkflowStep.Name,
                 x.ActorId, x.Actor.FullName, x.ActionType, x.Comment, x.CreatedAt)).ToListAsync(ct);
         return new RequestSnapshot(request.Id, definition.Id, definition.Name, definition.Version, request.RequesterId,
             request.Title, request.Description, request.Amount, request.Department, request.Status, request.CurrentStepId,
-            currentName, request.CreatedAt, request.CompletedAt, Convert.ToBase64String(request.RowVersion), history.AsReadOnly());
+            current?.Name, request.CreatedAt, request.CompletedAt, Convert.ToBase64String(request.RowVersion), history.AsReadOnly(),
+            WorkflowGraph.Read(definition.GraphJson), current?.GraphNodeId, GraphRuntime.ReadValues(request.FormValuesJson));
     }
 
     private async Task<WorkflowResult> ExecuteAsync(string actorId,

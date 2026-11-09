@@ -1,0 +1,107 @@
+@model MiniWorkflowEngine.ViewModels.GraphEditorViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Görsel süreç tasarımcısı";
+    var readOnly = ViewData["ReadOnly"] is true;
+    var roles = (List<SelectListItem>)ViewData["Roles"]!;
+    var users = (List<SelectListItem>)ViewData["Users"]!;
+    var departments = (List<SelectListItem>)ViewData["Departments"]!;
+}
+<section class="my-4">
+    <a asp-action="Index" class="small text-decoration-none">← Süreç tanımlarına dön</a>
+    <div class="page-heading mt-3"><div><span class="eyebrow">YÖNETİM / SÜREÇ VE FORM</span><h1 class="h2 mt-2">Görsel süreç tasarımcısı</h1></div>
+        <span class="role-badge">@(readOnly ? "Yayımlanmış sürüm" : "Taslak")</span>
+    </div>
+    <form asp-action="Designer" asp-route-id="@(Model.Id == 0 ? null : (int?)Model.Id)" method="post" id="graph-editor" data-readonly="@readOnly.ToString().ToLowerInvariant()">
+        <input asp-for="Id" type="hidden" /><input asp-for="RowVersion" type="hidden" /><input asp-for="GraphJson" type="hidden" />
+        <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+        <div class="surface-card mt-3">
+            <div class="row g-3">
+                <div class="col-md-4"><label asp-for="Code" class="form-label"></label><input asp-for="Code" class="form-control" readonly="@(Model.Id != 0)" maxlength="50" /></div>
+                <div class="col-md-8"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" readonly="@readOnly" maxlength="150" /></div>
+                <div class="col-12"><label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control" readonly="@readOnly" maxlength="2000"></textarea></div>
+            </div>
+        </div>
+        <div class="surface-card mt-3">
+            <h2 class="h5">İş akışı</h2>
+            <p class="small text-muted">Paletten düğüm ekleyin veya tuvale sürükleyin. Düğümü seçerek özelliklerini, iki düğüm seçerek bağlantılarını düzenleyin.</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                @if (!readOnly)
+                {
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="start" draggable="true">+ Başlangıç</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="task" draggable="true">+ Kullanıcı görevi</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="approval" draggable="true">+ Onay</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="decision" draggable="true">+ Karar</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="end" draggable="true">+ Bitiş</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-undo">Geri al</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-redo">Yinele</button>
+                }
+                <label class="small d-flex align-items-center gap-2">Yakınlaştır <input id="graph-zoom" type="range" min="50" max="150" value="100" /></label>
+            </div>
+            <div class="graph-workspace">
+                <div class="graph-viewport" id="graph-viewport" tabindex="0" aria-label="İş akışı tuvali">
+                    <div class="graph-canvas" id="graph-canvas"><svg class="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div></div>
+                </div>
+                <div class="graph-inspector">
+                    <h3 class="h6">Düğüm özellikleri</h3>
+                    <p id="graph-no-selection" class="small text-muted">Tuvalden bir düğüm seçin.</p>
+                    <fieldset id="graph-node-properties" hidden disabled="@readOnly">
+                        <label class="form-label d-block">Düğüm adı<input class="form-control" id="node-name" maxlength="150" /></label>
+                        <div class="row g-2 mb-2">
+                            <label class="col-6 small">Yatay konum<input class="form-control" id="node-x" type="number" min="0" max="6000" /></label>
+                            <label class="col-6 small">Dikey konum<input class="form-control" id="node-y" type="number" min="0" max="6000" /></label>
+                        </div>
+                        <div id="node-assignment">
+                            <label class="form-label d-block">Sorumlu rol<select id="node-role" class="form-select"><option value="">Rol seçin</option>@foreach (var role in roles) { <option value="@role.Value">@role.Text</option> }</select></label>
+                            <label class="form-label d-block">Departman<select id="node-department" class="form-select"><option value="">Tüm departmanlar</option>@foreach (var dept in departments) { <option value="@dept.Value">@dept.Text</option> }</select></label>
+                            <label class="form-label d-block">Atanan kullanıcı<select id="node-user" class="form-select"><option value="">Role göre ata</option>@foreach (var user in users) { <option value="@user.Value">@user.Text</option> }</select></label>
+                            <label class="form-check mb-2"><input type="checkbox" id="node-return" class="form-check-input" /> Düzeltme için iade edilebilir</label>
+                        </div>
+                        <label id="node-end" class="form-label">Süreç sonucu<select class="form-select" id="node-outcome"><option value="completed">Tamamlandı</option><option value="rejected">Reddedildi</option></select></label>
+                        @if (!readOnly) { <button type="button" id="node-remove" class="btn btn-outline-danger btn-sm">Düğümü ve bağlantılarını sil</button> }
+                    </fieldset>
+                </div>
+            </div>
+            <h3 class="h6 mt-3">Bağlantılar</h3>
+            @if (!readOnly)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm mb-2" id="route-pick">Tuvalden iki düğüm seç</button>
+                <p class="small text-muted">Bir karar düğümünde ilk eşleşen koşul kullanılır. Bağlantı sırasını listeden değiştirebilirsiniz.</p>
+                <div class="row g-2 align-items-end mb-3">
+                    <label class="col-md-4 small">Kaynak düğüm<select class="form-select" id="route-from"></select></label>
+                    <label class="col-md-4 small">Hedef düğüm<select class="form-select" id="route-to"></select></label>
+                    <label class="col-md-4 small">Geçiş türü<select class="form-select" id="route-kind"></select></label>
+                    <div id="route-rule" class="row g-2 m-0 p-0" hidden>
+                        <label class="col-md-4 small">Değişken<select id="route-variable" class="form-select"></select></label>
+                        <label class="col-md-4 small">Karşılaştırma<select id="route-operator" class="form-select">
+                            <option value="equals">Eşittir</option><option value="notEquals">Eşit değildir</option><option value="greaterThan">Büyüktür</option><option value="greaterThanOrEqual">Büyük veya eşittir</option><option value="lessThan">Küçüktür</option><option value="lessThanOrEqual">Küçük veya eşittir</option>
+                        </select></label>
+                        <label class="col-md-4 small">Karşılaştırma değeri<input id="route-value" class="form-control" maxlength="250" /></label>
+                    </div>
+                    <div class="col-12"><button type="button" class="btn btn-outline-primary btn-sm" id="route-save">Bağlantı ekle</button> <button type="button" class="btn btn-outline-secondary btn-sm" id="route-cancel" hidden>Vazgeç</button></div>
+                </div>
+            }
+            <ol id="graph-routes" class="graph-routes mb-0"></ol>
+        </div>
+        <div class="surface-card mt-3">
+            <h2 class="h5">Form tasarımcısı</h2>
+            <p class="small text-muted">Alanları sürükleyerek sıralayın. Değişken anahtarı karar kurallarında kullanılır. Başlık, açıklama, tutar ve departman standart alanlardır.</p>
+            @if (!readOnly)
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <select class="form-select w-auto" id="field-kind" aria-label="Alan türü"><option value="text">Metin</option><option value="longText">Uzun metin</option><option value="number">Sayı</option><option value="amount">Tutar</option><option value="date">Tarih</option><option value="checkbox">Onay kutusu</option><option value="choice">Seçenek listesi</option></select>
+                    <button type="button" class="btn btn-outline-primary" id="field-add" draggable="true">+ Alan ekle</button>
+                </div>
+            }
+            <div id="graph-fields" class="graph-fields"></div>
+        </div>
+        <p class="small text-danger mt-2 mb-0" id="graph-message" role="status"></p>
+        @if (!readOnly)
+        {
+            <noscript><p class="text-danger mt-3">Tasarımcı için JavaScript gereklidir.</p></noscript>
+            <button class="btn btn-primary mt-3" id="graph-save" disabled>Taslağı kaydet</button>
+        }
+        @if (Model.Id != 0) { <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary mt-3">Süreç detayına dön</a> }
+    </form>
+</section>
+@section Scripts { <script src="~/js/graph-designer.js" asp-append-version="true"></script> }

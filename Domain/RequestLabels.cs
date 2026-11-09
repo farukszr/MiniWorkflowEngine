@@ -7,7 +7,8 @@ public static class RequestLabels
     public static string Status(RequestStatus status) => status switch
     {
         RequestStatus.Draft => "Taslak", RequestStatus.Pending => "Onay bekliyor", RequestStatus.Approved => "Onaylandı",
-        RequestStatus.Rejected => "Reddedildi", RequestStatus.Cancelled => "İptal edildi", _ => "Bilinmeyen"
+        RequestStatus.Rejected => "Reddedildi", RequestStatus.Cancelled => "İptal edildi",
+        RequestStatus.Returned => "Düzeltme bekliyor", _ => "Bilinmeyen"
     };
     public static string Action(RequestActionType action) => action switch
     {
@@ -16,6 +17,10 @@ public static class RequestLabels
         RequestActionType.Rejected => "Talep reddedildi", RequestActionType.Cancelled => "Talep iptal edildi",
         RequestActionType.AdministratorApproved => "Yönetici adımı onayladı",
         RequestActionType.AdministratorRejected => "Yönetici talebi reddetti",
+        RequestActionType.TaskCompleted => "Görev tamamlandı",
+        RequestActionType.Returned => "Düzeltme için iade edildi",
+        RequestActionType.Resubmitted => "Yeniden gönderildi",
+        RequestActionType.RouteSelected => "Karar yolu seçildi",
         RequestActionType.StepSkipped => "Adım otomatik atlandı", RequestActionType.Completed => "Süreç tamamlandı", _ => "İşlem"
     };
     public static string StatusClass(RequestStatus status) => status switch

@@ -8,7 +8,7 @@
     var now = DateTimeOffset.UtcNow;
     var (title, action, description) = Model.Scope switch
     {
-        RequestListScope.Inbox => ("Bekleyen onaylar", "Inbox", "Rolünüze atanmış, kararınızı bekleyen talepler."),
+        RequestListScope.Inbox => ("Bekleyen onaylar", "Inbox", "Onay, kullanıcı görevi ve düzeltme için size atanmış işler."),
         RequestListScope.All => ("Tüm talepler", "All", "Talepleri durumuna göre inceleyin ve işlem geçmişini takip edin."),
         _ => ("Taleplerim", "Index", "Taslaklarınızı ve gönderdiğiniz taleplerin durumunu takip edin.")
     };
@@ -36,7 +36,7 @@
         <p class="small text-muted mt-3">@Model.TotalCount talep · Sayfa @Model.Page / @Model.TotalPages</p>
         @if (Model.Items.Count == 0)
         {
-            <div class="empty-state"><h2 class="h5">@(inbox ? "Bekleyen onay bulunmuyor" : "Talep bulunamadı")</h2><p class="text-muted mb-0">@(inbox ? "Sırası gelen ve rolünüze atanan talepler burada görünecek. Kendi talepleriniz bu listeye dahil edilmez." : "Arama ve durum filtrelerinizi değiştirebilirsiniz.")</p></div>
+            <div class="empty-state"><h2 class="h5">@(inbox ? "Bekleyen görev bulunmuyor" : "Talep bulunamadı")</h2><p class="text-muted mb-0">@(inbox ? "Size atanan onaylar, kullanıcı görevleri ve düzeltmeler burada görünür." : "Arama ve durum filtrelerinizi değiştirebilirsiniz.")</p></div>
         }
         else
         {

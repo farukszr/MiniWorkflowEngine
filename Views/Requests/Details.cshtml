@@ -4,6 +4,9 @@
 @using MiniWorkflowEngine.ViewModels
 @{
     var request = Model.Request;
+    var node = request.Graph?.Nodes.FirstOrDefault(x => x.Id == request.CurrentNodeId);
+    var isTask = node?.Kind == NodeKind.Task;
+    var returned = request.Status == RequestStatus.Returned;
     var (listAction, listLabel) = Model.Scope switch
     {
         RequestListScope.Inbox => ("Inbox", "Bekleyen onaylar"),
@@ -30,28 +33,43 @@
             <section class="surface-card">
                 <h2 class="h5">Talep bilgileri</h2><p class="request-description mt-3">@request.Description</p>
                 <dl class="request-facts"><div><dt>Talep sahibi</dt><dd>@Model.RequesterName</dd></div><div><dt>Tutar</dt><dd>@(request.Amount?.ToString("N2") ?? "Belirtilmedi")</dd></div><div><dt>Departman</dt><dd>@(request.Department ?? "Belirtilmedi")</dd></div><div><dt>Oluşturulma (UTC)</dt><dd>@request.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</dd></div><div><dt>Geçerli adım</dt><dd>@(request.CurrentStepName ?? "—")</dd></div>@if (request.CompletedAt is not null) { <div><dt>Tamamlanma (UTC)</dt><dd>@request.CompletedAt.Value.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</dd></div> }</dl>
+                @if (request.Graph is { Fields.Length: > 0 } graph)
+                {
+                    <h3 class="h6 mt-3">Süreç formu</h3>
+                    <dl class="request-facts">
+                        @foreach (var field in graph.Fields)
+                        {
+                            var value = request.FormValues?.GetValueOrDefault(field.Key);
+                            <div><dt>@field.Label</dt><dd class="request-description">@(field.Kind == FieldKind.Checkbox ? value switch { "true" => "Evet", "false" => "Hayır", _ => "—" } : value ?? "—")</dd></div>
+                        }
+                    </dl>
+                }
                 @if (Model.CanEdit)
                 {
-                    <div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@request.Id">Taslağı düzenle</a>
+                    <div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@request.Id">@(returned ? "Talebi düzelt" : "Taslağı düzenle")</a>
                     @if (Model.CanSubmit)
                     {
-                        <form asp-action="Submit" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><button class="btn btn-primary">Onaya gönder</button></form>
+                        <form asp-action="Submit" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><button class="btn btn-primary">@(returned ? "Yeniden gönder" : "Onaya gönder")</button></form>
                     }
                     </div>
-                    @if (!Model.IsWorkflowActive) { <p class="small text-danger mt-3">Bu taslağın süreç sürümü arşivlendi. Etkin sürümle yeni talep oluşturun.</p> }
+                    @if (!Model.IsWorkflowActive && !returned) { <p class="small text-danger mt-3">Bu taslağın süreç sürümü arşivlendi. Etkin sürümle yeni talep oluşturun.</p> }
                 }
             </section>
             @if (Model.CanDecide)
             {
-                <section class="surface-card mt-4"><h2 class="h5">Onay kararı</h2><p class="text-muted small">@request.CurrentStepName adımı için karar verin. Ret işleminde gerekçe zorunludur.</p>
+                <section class="surface-card mt-4"><h2 class="h5">@(isTask ? "Kullanıcı görevi" : "Onay kararı")</h2><p class="text-muted small">@request.CurrentStepName adımı. Ret ve iade işlemlerinde gerekçe zorunludur.</p>
                     @if (Model.IsAdministrativeDecision)
                     {
                         <p class="alert alert-warning py-2 small">Bu adım için yönetici olarak karar veriyorsunuz. Kararınız işlem geçmişine yönetici kararı olarak kaydedilir.</p>
                     }
-                    <form asp-action="Approve" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" />
+                    <form asp-action="@(isTask ? "CompleteTask" : "Approve")" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" />
                         <input type="hidden" name="Scope" value="@Model.Scope" />
                         <label asp-for="Comment" class="form-label"></label><textarea asp-for="Comment" class="form-control mb-2" rows="3" maxlength="2000"></textarea><span asp-validation-for="Comment" class="text-danger small"></span>
-                        <div class="d-flex gap-2 mt-3"><button class="btn btn-success" type="submit">Onayla</button><button class="btn btn-outline-danger" type="submit" formaction="@Url.Action("Reject", new { id = request.Id })">Reddet</button></div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="btn btn-success" type="submit">@(isTask ? "Görevi tamamla" : "Onayla")</button>
+                            @if (!isTask) { <button class="btn btn-outline-danger" type="submit" formaction="@Url.Action("Reject", new { id = request.Id })">Reddet</button> }
+                            @if (node?.AllowReturn == true) { <button class="btn btn-outline-secondary" type="submit" formaction="@Url.Action("Return", new { id = request.Id })">Düzeltmeye iade et</button> }
+                        </div>
                     </form>
                 </section>
             }

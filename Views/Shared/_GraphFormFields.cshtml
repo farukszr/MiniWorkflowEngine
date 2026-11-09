@@ -1,0 +1,29 @@
+@model (string Prefix, MiniWorkflowEngine.Domain.GraphField[] Fields, IReadOnlyDictionary<string, string?> Values)
+@using MiniWorkflowEngine.Domain
+@foreach (var field in Model.Fields)
+{
+    var control = $"{Model.Prefix}-{field.Key}";
+    var fieldName = $"FormValues[{field.Key}]";
+    var value = Model.Values.GetValueOrDefault(field.Key);
+    <div class="mb-3">
+        <label for="@control" class="form-label">@field.Label @(field.Required ? "(gönderirken zorunlu)" : "")</label>
+        @switch (field.Kind)
+        {
+            case FieldKind.LongText:
+                <textarea id="@control" name="@fieldName" rows="3" maxlength="2000" class="form-control">@value</textarea>
+                break;
+            case FieldKind.Choice:
+                <select id="@control" name="@fieldName" class="form-select"><option value="">Seçin</option>
+                @foreach (var option in field.Options!) { <option value="@option" selected="@(option == value)">@option</option> }
+                </select>
+                break;
+            case FieldKind.Checkbox:
+                <div><input id="@control" name="@fieldName" type="checkbox" class="form-check-input" value="true" checked="@(value == "true")" /><input type="hidden" name="@fieldName" value="false" /></div>
+                break;
+            default:
+                <input id="@control" name="@fieldName" value="@value" type="@(field.Kind == FieldKind.Date ? "date" : "text")"
+                       inputmode="@(field.Kind is FieldKind.Number or FieldKind.Amount ? "decimal" : null)" maxlength="2000" class="form-control" />
+                break;
+        }
+    </div>
+}

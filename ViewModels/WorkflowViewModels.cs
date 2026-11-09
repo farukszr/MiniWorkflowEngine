@@ -28,6 +28,7 @@ public sealed class WorkflowEditorViewModel
     [BindNever, ValidateNever] public bool CanEdit { get; set; }
     [BindNever, ValidateNever] public bool IsActive { get; set; }
     [BindNever, ValidateNever] public bool IsPublished { get; set; }
+    [BindNever, ValidateNever] public bool IsGraph { get; set; }
     [BindNever, ValidateNever] public List<SelectListItem> AvailableRoles { get; set; } = [];
 }
 

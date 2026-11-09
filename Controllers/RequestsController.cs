@@ -65,10 +65,11 @@ public sealed class RequestsController(IWorkflowEngine engine, RequestQueryServi
         if (!result.Succeeded) return Denied(result);
         var request = result.Request!;
         if (request.RequesterId != ActorId) return ForbiddenView();
-        if (request.Status != RequestStatus.Draft) return RedirectToAction(nameof(Details), new { id });
+        if (request.Status is not (RequestStatus.Draft or RequestStatus.Returned)) return RedirectToAction(nameof(Details), new { id });
         return View(new RequestEditorViewModel { Id = request.Id, RowVersion = request.RowVersion,
             WorkflowDefinitionId = request.WorkflowDefinitionId, Title = request.Title, Description = request.Description,
             Amount = request.Amount?.ToString("0.00", CultureInfo.GetCultureInfo("tr-TR")), Department = request.Department,
+            FormValues = request.FormValues?.ToDictionary() ?? [],
             Workflows = await queries.WorkflowsAsync(request.WorkflowDefinitionId, ct) });
     }
 
@@ -113,6 +114,15 @@ public sealed class RequestsController(IWorkflowEngine engine, RequestQueryServi
     [HttpPost]
     public Task<IActionResult> Cancel([FromRoute] int id, RequestActionViewModel model, CancellationToken ct)
         => ExecuteAsync(id, model, engine.CancelAsync, "Talep iptal edildi.", ct);
+    [HttpPost]
+    public Task<IActionResult> CompleteTask([FromRoute] int id, RequestActionViewModel model, CancellationToken ct)
+        => ExecuteAsync(id, model, engine.CompleteTaskAsync, "Görev tamamlandı.", ct);
+    [HttpPost]
+    public Task<IActionResult> Return([FromRoute] int id, RequestActionViewModel model, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(model.Comment)) ModelState.AddModelError(nameof(model.Comment), "İade gerekçesi girin.");
+        return ExecuteAsync(id, model, engine.ReturnAsync, "Talep düzeltme için iade edildi.", ct);
+    }
 
     private async Task<IActionResult> ExecuteAsync(int id, RequestActionViewModel model,
         Func<RequestCommand, string, CancellationToken, Task<WorkflowResult>> operation, string success, CancellationToken ct)

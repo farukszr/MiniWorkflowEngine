@@ -89,6 +89,8 @@ internal static partial class AuthenticationChecks
             await CheckWorkflowDefinitionsAsync(factory, adminClient, employeeClient);
             await CheckRequestScreensAsync(factory, adminClient, employeeClient);
             await CheckApprovalOperationsAsync(factory, adminClient, employeeClient);
+            await CheckGraphPlatformAsync(factory, adminClient, employeeClient);
+            await CheckDesignerBrowserAsync(adminClient);
 
             var getLogout = await adminClient.GetAsync("/Account/Logout");
             Require(getLogout.StatusCode is HttpStatusCode.MethodNotAllowed or HttpStatusCode.NotFound &&

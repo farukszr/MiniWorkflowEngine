@@ -1,0 +1,48 @@
+@model MiniWorkflowEngine.ViewModels.ReportsViewModel
+@using MiniWorkflowEngine.Domain
+@using MiniWorkflowEngine.Domain.Enums
+@{ ViewData["Title"] = "Süreç raporları"; }
+<section class="my-4">
+    <div class="page-heading"><div><span class="eyebrow">YÖNETİM / İSTATİSTİKLER</span><h1 class="h2 mt-2">Süreç raporları</h1>
+        <p class="text-muted mb-0">Talepleri süreç sürümü, departman, tarih ve duruma göre inceleyin.</p></div></div>
+    <div class="surface-card mt-4">
+        <form asp-action="Reports" method="get" class="row g-3 align-items-end">
+            <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
+            <label class="col-md-3">Başlangıç tarihi (UTC)<input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control" /></label>
+            <label class="col-md-3">Bitiş tarihi (UTC)<input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control" /></label>
+            <label class="col-md-3">Departman<select name="departmentId" class="form-select"><option value="">Tümü</option>
+                @foreach (var item in Model.Departments) { <option value="@item.Value" selected="@(item.Value == Model.DepartmentId?.ToString())">@item.Text</option> }
+            </select></label>
+            <label class="col-md-3">Süreç<select name="code" class="form-select"><option value="">Tümü</option>
+                @foreach (var item in Model.Processes) { <option value="@item.Value" selected="@(item.Value == Model.Code)">@item.Text</option> }
+            </select></label>
+            <label class="col-md-3">Durum<select name="status" class="form-select"><option value="">Tümü</option>
+                @foreach (var status in Enum.GetValues<RequestStatus>()) { <option value="@status" selected="@(status == Model.Status)">@RequestLabels.Status(status)</option> }
+            </select></label>
+            <div class="col-md-6"><button class="btn btn-primary">Filtrele</button> <a asp-action="Reports" class="btn btn-link">Temizle</a></div>
+        </form>
+    </div>
+    <div class="shortcut-grid mt-3">
+        <div class="surface-card"><span class="text-muted">Toplam talep</span><div class="h3 mt-2 mb-0">@Model.Rows.Sum(x => x.Total)</div></div>
+        <div class="surface-card"><span class="text-muted">Geciken görev</span><div class="h3 mt-2 mb-0">@Model.Rows.Sum(x => x.Overdue)</div></div>
+    </div>
+    <div class="surface-card mt-3">
+        <h2 class="h5">Sürüm bazında sonuçlar</h2>
+        @if (Model.Rows.Count == 0) { <p class="text-muted mb-0">Seçilen filtrelerle eşleşen talep bulunamadı.</p> }
+        else
+        {
+            <div class="table-responsive"><table class="table user-table align-middle">
+                <thead><tr><th scope="col">Süreç</th><th scope="col">Toplam</th><th scope="col">Bekleyen</th><th scope="col">Geciken</th><th scope="col">Onaylanan</th><th scope="col">Reddedilen</th><th scope="col">İade</th><th scope="col">Ortalama süre</th></tr></thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr><td><strong>@row.Name</strong><span class="d-block small text-muted">@row.Code · v@(row.Version)</span></td><td>@row.Total</td>
+                            <td>@row.Pending</td><td>@row.Overdue</td><td>@row.Approved</td><td>@row.Rejected</td><td>@row.Returned</td>
+                            <td>@(row.AverageMinutes is { } minutes ? $"{minutes / 60:N1} sa." : "—")</td></tr>
+                    }
+                </tbody>
+            </table></div>
+            <p class="small text-muted mb-0">Ortalama süre, sonuçlanan kayıtların oluşturulmasından kapanışına kadar geçen süredir. Departman filtresi, talep oluşturulurken kayıtlı üyeliği kullanır.</p>
+        }
+    </div>
+</section>

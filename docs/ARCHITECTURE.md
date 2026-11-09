@@ -38,9 +38,9 @@ flowchart LR
 - Motor her çağrıda bağımsız DbContext/transaction kullanır. Talep durumu ve geçmişi
   birlikte kaydedilir; `rowversion` eski formları yakalar. SQL kilit çakışmaları
   kontrollü Conflict sonucuna dönüştürülür.
-- Kimlik doğrulanmış kullanıcı kendi talebini oluşturabilir. Karar, güncel adım
-  rolünden gelir; Yönetici rolü otomatik onay yetkisi sağlamaz. Kendi talebine
-  onay/ret verilemez.
+- Kimlik doğrulanmış kullanıcı kendi talebini oluşturabilir. Karar, güncel adımın
+  rolü ve varsa kişi/departman ataması üzerinden verilir. Yönetici gerektiğinde
+  doğrudan müdahale edebilir. Kendi talebine onay veya ret verilemez.
 - Geçmiş uygulamanın EF Core kayıt yollarında yalnızca eklenebilir. Doğrudan SQL
   yönetim erişimi bu uygulama kuralının dışındadır.
 
@@ -57,10 +57,19 @@ Migration yükseltmesi, Identity/CSRF, kullanıcı/rol ve süreç ekranları, ta
 ekranları, koşul sınırları, gerçek paralel kararlar ve kasıtlı SQL hatasında geri
 alma doğrulanır.
 
-## Sürüm kapsamı
+## Grafik yürütme ve formlar
 
-İlk sürüm; dinamik süreç tanımı, sıralı/koşullu onay, roller, talepler ve geçmişi
-kapsar. BPMN sürükle-bırak editörü, paralel ağ geçitleri, zamanlayıcı/SLA,
-delegasyon, dosya ekleri, e-posta bildirimi, MFA ve parola sıfırlama dahil değildir.
-Bu, üretim sertifikasyonu iddiası olmayan bir portföy uygulamasıdır.
+- Süreç sürümü, grafik ve form şemasını `GraphJson` alanında birlikte taşır.
+  Yayımlama, insan görevlerini mevcut `WorkflowSteps` kayıtlarına bağlar.
+  Böylece görev kutusu, yetki sorguları, `rowversion` ve işlem geçmişi ortak kalır.
+- `GraphRules` düğüm bağlantılarını, değişken türlerini ve ulaşılabilirliği
+  doğrular. `GraphRuntime` hem önizlemede hem gerçek yürütmede aynı yönlendirmeyi kullanır.
+- Grafik bir seferde tek aktif adım yürütür. Bir kararın ilk eşleşen çıkışı
+  kullanılır. Düzeltmeye iade, talep sahibine düzenleme hakkı verir ve yeniden
+  gönderim aynı adıma döner. Düzeltme boyunca talep, yayımlanan sürümünü korur.
+- Form alanları sabit anahtarlarla koşullara bağlanır. Taslak ve düzeltme
+  aşamalarında talep sahibi form değerlerini günceller. Görevli, değerleri okuyup
+  kendi adımını sonuçlandırır.
+- Mevcut sıralı süreçler `GraphJson` boş olan sürümler üzerinden yürür. Bu
+  süreçlerde eski koşul atlama ve onay kuralları uygulanmaya devam eder.
 
