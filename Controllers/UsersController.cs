@@ -17,6 +17,18 @@ public sealed class UsersController(UserAdministrationService service, UserManag
     public async Task<IActionResult> Index(string? search, int page = 1) => View(await service.ListAsync(search, page));
 
     [HttpGet]
+    public async Task<IActionResult> RoleCatalog() => View(await service.AvailableRoleNamesAsync());
+
+    [HttpPost]
+    public async Task<IActionResult> AddRole(string? name)
+    {
+        var result = await service.CreateRoleAsync(name ?? "", users.GetUserId(User)!);
+        if (result.Succeeded) TempData["Success"] = "Görev rolü oluşturuldu.";
+        else TempData["RoleError"] = string.Join(" ", result.Errors.Select(error => error.Description));
+        return RedirectToAction(nameof(RoleCatalog));
+    }
+
+    [HttpGet]
     public async Task<IActionResult> RecoveryCode(string id)
     {
         var model = await recovery.GetAccountAsync(id);
@@ -31,7 +43,11 @@ public sealed class UsersController(UserAdministrationService service, UserManag
     }
 
     [HttpGet]
-    public IActionResult Create() => View(new CreateUserViewModel { Roles = [ApplicationRoles.Employee] });
+    public async Task<IActionResult> Create()
+    {
+        ViewData["AvailableRoleNames"] = await service.AvailableRoleNamesAsync();
+        return View(new CreateUserViewModel { Roles = [ApplicationRoles.Employee] });
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateUserViewModel model)
@@ -49,6 +65,7 @@ public sealed class UsersController(UserAdministrationService service, UserManag
         model.Password = model.ConfirmPassword = string.Empty;
         ModelState.SetModelValue(nameof(model.Password), string.Empty, string.Empty);
         ModelState.SetModelValue(nameof(model.ConfirmPassword), string.Empty, string.Empty);
+        ViewData["AvailableRoleNames"] = await service.AvailableRoleNamesAsync();
         return View(model);
     }
 
@@ -56,6 +73,7 @@ public sealed class UsersController(UserAdministrationService service, UserManag
     public async Task<IActionResult> Roles(string id)
     {
         var model = await service.GetRolesAsync(id);
+        ViewData["AvailableRoleNames"] = await service.AvailableRoleNamesAsync();
         return model is null ? NotFound() : View(model);
     }
 
@@ -84,6 +102,7 @@ public sealed class UsersController(UserAdministrationService service, UserManag
         }
         model.FullName = existing.FullName;
         model.Email = existing.Email;
+        ViewData["AvailableRoleNames"] = await service.AvailableRoleNamesAsync();
         return View(model);
     }
 }

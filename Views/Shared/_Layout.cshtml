@@ -5,7 +5,8 @@
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewData["RequestNavigation"] as string ?? ViewContext.RouteData.Values["action"]?.ToString();
     var accountName = User.Identity?.Name ?? "";
-    var accountRoles = string.Join(" · ", ApplicationRoles.All.Where(User.IsInRole).Select(ApplicationRoles.DisplayName));
+    var accountRoles = string.Join(" · ", User.FindAll(System.Security.Claims.ClaimTypes.Role)
+        .Select(claim => ApplicationRoles.DisplayName(claim.Value)).Distinct());
     var nav = new List<(string Controller, string Action, string Label, string Icon)>
     {
         ("Home", "Index", "Ana Sayfa", "home"),

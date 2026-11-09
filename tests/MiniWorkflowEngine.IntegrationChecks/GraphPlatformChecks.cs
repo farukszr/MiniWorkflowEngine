@@ -16,7 +16,14 @@ internal static partial class AuthenticationChecks
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var approver = await db.Users.AsNoTracking().SingleAsync(x => x.Email == "screen-approver@example.invalid");
         var employee = await db.Users.AsNoTracking().SingleAsync(x => x.Email == "employee@example.invalid");
-        var role = await db.Roles.AsNoTracking().SingleAsync(x => x.Name == ApplicationRoles.Approver);
+        const string customRole = "Grafik görev kontrolü";
+        Require((await PostFormAsync(admin, "/Users/RoleCatalog", "/Users/AddRole", new() { ["name"] = customRole })).StatusCode == HttpStatusCode.Redirect,
+            "Özel görev rolü oluşturulamadı.");
+        var role = await db.Roles.AsNoTracking().SingleAsync(x => x.Name == customRole);
+        var rolesPage = await admin.GetStringAsync($"/Users/Roles/{approver.Id}");
+        Require((await PostRolesAsync(admin, approver.Id, rolesPage, [ApplicationRoles.Approver, customRole])).StatusCode == HttpStatusCode.Redirect &&
+            await db.UserRoles.AnyAsync(x => x.UserId == approver.Id && x.RoleId == role.Id),
+            "Özel görev rolü kullanıcıya atanamadı.");
         Require((await PostFormAsync(admin, "/Departments", "/Departments/Save", new() { ["name"] = "Grafik Test Birimi" })).StatusCode == HttpStatusCode.Redirect,
             "Departman oluşturulamadı.");
         var department = await db.Departments.AsNoTracking().SingleAsync(x => x.Name == "Grafik Test Birimi");
@@ -86,7 +93,8 @@ internal static partial class AuthenticationChecks
             finished.Actions.Any(x => x.ActionType == RequestActionType.Resubmitted), "Grafik sonucu, departman ve geçmiş birlikte korunmalı.");
         var report = WebUtility.HtmlDecode(await admin.GetStringAsync($"/Administration/Reports?departmentId={department.Id}&code=GRAPH_CHECK"));
         Require(report.Contains("Grafik entegrasyon süreci") && !report.Contains("Ekran Masraf Süreci"), "Rapor departman ve süreç filtresini uygulamalı.");
-        Require((await requester.GetAsync("/Administration/Reports")).StatusCode == HttpStatusCode.Redirect,
+        Require((await requester.GetAsync("/Administration/Reports")).StatusCode == HttpStatusCode.Redirect &&
+            (await assignee.GetAsync("/Administration/Reports")).StatusCode == HttpStatusCode.Redirect,
             "Rapor yalnız yetkili kullanıcıya açılmalı.");
         Console.WriteLine("BAŞARILI: Görsel grafik, form değişkeni, departman ataması, görev, iade ve rapor uçtan uca.");
 

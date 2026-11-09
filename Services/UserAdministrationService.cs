@@ -9,7 +9,7 @@ using MiniWorkflowEngine.ViewModels;
 
 namespace MiniWorkflowEngine.Services;
 
-public sealed class UserAdministrationService(ApplicationDbContext db, UserManager<ApplicationUser> users)
+public sealed class UserAdministrationService(ApplicationDbContext db, UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles)
 {
     private const int PageSize = 20;
 
@@ -47,7 +47,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, UserManag
         => InTransactionAsync(async () =>
         {
             if (!await IsAdministratorAsync(actorId)) return Failed("Bu işlem için yönetici yetkisi gerekiyor.");
-            if (!ValidRoles(model.Roles)) return Failed("Listeden en az bir geçerli rol seçin.");
+            if (!await ValidRolesAsync(model.Roles)) return Failed("Listeden en az bir geçerli rol seçin.");
             if (model.FullName.Trim().Length is < 2 or > 150) return Failed("Ad soyad 2–150 karakter olmalıdır.");
             var user = new ApplicationUser { FullName = model.FullName.Trim(), Email = model.Email.Trim(), UserName = model.Email.Trim() };
             var created = await users.CreateAsync(user, model.Password);
@@ -63,7 +63,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, UserManag
         => InTransactionAsync(async () =>
         {
             if (!await IsAdministratorAsync(actorId)) return Failed("Bu işlem için yönetici yetkisi gerekiyor.");
-            if (!ValidRoles(model.Roles)) return Failed("Listeden en az bir geçerli rol seçin.");
+            if (!await ValidRolesAsync(model.Roles)) return Failed("Listeden en az bir geçerli rol seçin.");
             var user = await users.FindByIdAsync(model.Id);
             if (user is null) return Failed("Kullanıcı bulunamadı.");
             if (user.ConcurrencyStamp != model.ConcurrencyStamp)
@@ -98,8 +98,32 @@ public sealed class UserAdministrationService(ApplicationDbContext db, UserManag
         return actor is not null && await users.IsInRoleAsync(actor, ApplicationRoles.Administrator);
     }
 
-    private static bool ValidRoles(string[]? roles)
-        => roles is { Length: > 0 } && roles.All(x => ApplicationRoles.All.Contains(x, StringComparer.Ordinal));
+    public Task<string[]> AvailableRoleNamesAsync()
+        => db.Roles.AsNoTracking().Where(x => x.Name != null).OrderBy(x => x.Name).Select(x => x.Name!).ToArrayAsync();
+
+    public Task<IdentityResult> CreateRoleAsync(string name, string actorId)
+        => InTransactionAsync(async () =>
+        {
+            if (!await IsAdministratorAsync(actorId)) return Failed("Bu işlem için yönetici yetkisi gerekiyor.");
+            name = name.Trim();
+            var normalized = roles.NormalizeKey(name);
+            if (name.Length is < 2 or > 60 || name.Any(char.IsControl) ||
+                ApplicationRoles.All.Any(role => roles.NormalizeKey(ApplicationRoles.DisplayName(role)) == normalized))
+                return Failed("2–60 karakterlik farklı bir görev rolü adı girin.");
+            if (await roles.RoleExistsAsync(name)) return Failed("Bu rol adı zaten kullanımda.");
+            var result = await roles.CreateAsync(new IdentityRole(name));
+            if (!result.Succeeded) return result;
+            db.RecordAdministrationEvent(actorId, "Görev rolü oluşturuldu", name);
+            await db.SaveChangesAsync();
+            return result;
+        });
+
+    private async Task<bool> ValidRolesAsync(string[]? selected)
+    {
+        if (selected is not { Length: > 0 }) return false;
+        var available = await AvailableRoleNamesAsync();
+        return selected.All(role => available.Contains(role, StringComparer.Ordinal));
+    }
 
     private async Task<IdentityResult> InTransactionAsync(Func<Task<IdentityResult>> action)
     {

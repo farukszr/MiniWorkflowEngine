@@ -1,0 +1,17 @@
+@model string[]
+@using MiniWorkflowEngine.Domain
+@{ ViewData["Title"] = "Görev rolleri"; }
+<section class="my-4">
+    <a asp-action="Index" class="small text-decoration-none">← Kullanıcı yönetimine dön</a>
+    <h1 class="h2 mt-3">Görev rolleri</h1>
+    @if (TempData["Success"] is string success) { <p class="alert alert-success mt-3" role="status">@success</p> }
+    @if (TempData["RoleError"] is string error) { <p class="alert alert-danger mt-3" role="alert">@error</p> }
+    <div class="surface-card mt-4">
+        <p class="text-muted">Örneğin Finans onayı veya Satın alma kontrolü rolü oluşturun. Rolü kullanıcıya atadıktan sonra süreç tasarımcısında seçebilirsiniz.</p>
+        <form asp-action="AddRole" method="post" class="d-flex flex-wrap gap-2 align-items-end">
+            <label class="form-label mb-0">Yeni rol adı<input class="form-control" name="name" minlength="2" maxlength="60" required /></label>
+            <button class="btn btn-primary">Rol oluştur</button>
+        </form>
+        <ul class="mt-4 mb-0">@foreach (var role in Model) { <li>@ApplicationRoles.DisplayName(role)</li> }</ul>
+    </div>
+</section>

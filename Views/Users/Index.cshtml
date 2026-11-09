@@ -4,7 +4,10 @@
 <section class="my-4">
     <div class="page-heading">
         <div><span class="eyebrow">YÖNETİM / ERİŞİM</span><h1 class="h2 mt-2">Kullanıcılar</h1><p class="text-muted mb-0">Çalışma alanındaki hesapları ve rollerini yönetin.</p></div>
-        <a class="btn btn-primary" asp-action="Create">+ Kullanıcı oluştur</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary" asp-action="RoleCatalog">Görev rolleri</a>
+            <a class="btn btn-primary" asp-action="Create">+ Kullanıcı oluştur</a>
+        </div>
     </div>
     @if (TempData["Success"] is string success)
     {

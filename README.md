@@ -80,6 +80,7 @@ gösterir. [Giriş ekranını aç](https://localhost:7062/Account/Login)
 - Aynı tasarım ekranında dinamik form alanları oluşturma ve bu alanları karar değişkeni olarak kullanma.
 - Süreç detayındaki **Süreç önizleme** ile örnek değerlerden ilk görevi veya bitişi görme.
 - **Departmanlar** üzerinden birim oluşturma ve kullanıcı üyeliği atama. Görevleri role, departmana ve kişiye göre sınırlandırma.
+- **Kullanıcı yönetimi → Görev rolleri** ile kuruma özel roller oluşturma ve bunları süreç adımlarında kullanma.
 - **Raporlar** üzerinden süreç, departman, tarih ve durum bazında talep sayısı, gecikme ve ortalama kapanış süresi.
 - Dinamik ve sürümlü süreç tanımları; taslak, yayımlama ve arşivleme.
 - Sıralı onay adımları; tutar/departman koşulları ve otomatik adım atlama.

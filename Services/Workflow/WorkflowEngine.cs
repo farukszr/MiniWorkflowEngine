@@ -206,7 +206,7 @@ public sealed class WorkflowEngine(IServiceScopeFactory scopeFactory, WorkflowCo
     private async Task<Dictionary<int, bool>> EvaluateStepsAsync(ApplicationDbContext db, WorkflowRequest request, CancellationToken ct)
     {
         var steps = request.WorkflowDefinition.Steps.OrderBy(x => x.Order).ToArray();
-        var roles = await db.Roles.Where(x => ApplicationRoles.All.Contains(x.Name!)).Select(x => x.Id).ToListAsync(ct);
+        var roles = await db.Roles.Where(x => x.Name != null).Select(x => x.Id).ToListAsync(ct);
         return evaluator.EvaluateSteps(steps, roles, request.Amount, request.Department);
     }
 

@@ -36,7 +36,7 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
         if (required.Amount && amount is null) return preview with { Error = "Bu süreçte tutar koşulu var. Örnek tutarı girin." };
         if (required.Department && string.IsNullOrWhiteSpace(department)) return preview with { Error = "Bu süreçte departman koşulu var. Örnek departmanı girin." };
 
-        var roles = await db.Roles.Where(x => ApplicationRoles.All.Contains(x.Name!))
+        var roles = await db.Roles.Where(x => x.Name != null)
             .ToDictionaryAsync(x => x.Id, x => x.Name!, ct);
         try
         {
@@ -66,7 +66,7 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
     }
 
     public async Task<List<SelectListItem>> RolesAsync()
-        => (await db.Roles.AsNoTracking().Where(x => ApplicationRoles.All.Contains(x.Name!)).OrderBy(x => x.Name).ToListAsync())
+        => (await db.Roles.AsNoTracking().Where(x => x.Name != null).OrderBy(x => x.Name).ToListAsync())
             .Select(x => new SelectListItem(ApplicationRoles.DisplayName(x.Name!), x.Id)).ToList();
 
     public async Task<WorkflowEditorViewModel?> GetAsync(int id)
