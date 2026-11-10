@@ -49,15 +49,19 @@ internal static partial class AuthenticationChecks
             GraphRules.Validate(graph with { Nodes = [.. graph.Nodes, Node(NodeKind.End, "Kopuk bitiş")] }, publishing: true) is not null,
             "Grafik doğrulayıcı geçerli tasarımı kabul etmeli, eksik varsayılan yolu ve kopuk düğümü reddetmeli.");
         var designer = new Dictionary<string, string> { ["Id"] = "0", ["Code"] = "GRAPH_CHECK",
-            ["Name"] = "Grafik entegrasyon süreci", ["GraphJson"] = graph.Write() };
-        Require((await PostFormAsync(admin, "/Workflows/Designer", "/Workflows/Designer", designer)).StatusCode == HttpStatusCode.Redirect,
-            "Görsel taslak kaydedilemedi.");
+            ["Name"] = "Grafik entegrasyon süreci", ["GraphJson"] = graph.Write(), ["next"] = "preview" };
+        var saved = await PostFormAsync(admin, "/Workflows/Designer", "/Workflows/Designer", designer);
+        Require(saved.StatusCode == HttpStatusCode.Redirect && saved.Headers.Location?.ToString().Contains("/Workflows/GraphPreview/") == true,
+            "Kaydet ve test et, taslağı kaydedip önizleme ekranını açmalı.");
         var workflow = await db.WorkflowDefinitions.AsNoTracking().SingleAsync(x => x.Code == "GRAPH_CHECK");
         var definitionUrl = $"/Workflows/Details/{workflow.Id}";
         var previewUrl = $"/Workflows/GraphPreview/{workflow.Id}";
         var preview = await PostFormAsync(admin, previewUrl, previewUrl, new() { ["FormValues[priority]"] = "Acil" });
         Require(WebUtility.HtmlDecode(await preview.Content.ReadAsStringAsync()).Contains("İlk görev: Belgeleri incele"),
             "Önizleme, yayımlanacak grafiğin form koşulunu gerçek motorla aynı şekilde değerlendirmeli.");
+        var fallbackPreview = await PostFormAsync(admin, previewUrl, previewUrl, new() { ["FormValues[priority]"] = "Normal" });
+        Require(WebUtility.HtmlDecode(await fallbackPreview.Content.ReadAsStringAsync()).Contains("Süreç doğrudan tamamlanır"),
+            "Koşul eşleşmediğinde önizleme varsayılan yolu izlemeli.");
         var detail = await admin.GetStringAsync(definitionUrl);
         Require((await WorkflowCommandAsync(admin, workflow.Id, "Publish", HiddenValue(detail, "RowVersion"))).StatusCode == HttpStatusCode.Redirect &&
             await db.WorkflowDefinitions.AnyAsync(x => x.Id == workflow.Id && x.IsActive), "Grafik yayımlanamadı.");

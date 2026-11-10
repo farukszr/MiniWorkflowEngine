@@ -6,7 +6,7 @@
     var showManagementQueue = Model.AllPendingRequests > 0 && Model.AssignedApprovals == 0;
     var (heading, description) = (needsSetup, Model.AssignedApprovals > 0, showManagementQueue, Model.HasActiveWorkflow, Model.RequestDraft) switch
     {
-        (true, _, _, _, _) => ("İlk sürecinizi kullanıma açın", "Bir süreç yayımlandığında kullanıcılar o süreç üzerinden talep gönderebilir."),
+        (true, _, _, _, _) => ("İlk iş akışını kur", "Adımları tuvalde birleştir, örnek bir değerle dene ve çalışanların kullanımına aç."),
         (_, true, _, _, _) => ($"Kararınızı bekleyen {Model.AssignedApprovals} talep var", "Talepleri inceleyip onaylayın veya gerekçesiyle reddedin."),
         (_, _, true, _, _) => ($"{Model.AllPendingRequests} talep onay bekliyor", "Bekleyen adımları takip edin ve gerektiğinde yönetici olarak karar verin."),
         (_, _, _, _, { } draft) => ("Taslağınıza devam edin", $"“{draft.Title}” taslak olarak kayıtlı. Hazırsa detayından onaya gönderebilirsiniz."),
@@ -15,36 +15,48 @@
     };
 }
 <section class="home-focus" aria-labelledby="home-heading">
+    <div>
     <span class="eyebrow">Çalışma alanınız</span>
     <h1 id="home-heading">@heading</h1>
     <p>@description</p>
     <div class="d-flex flex-wrap gap-2">
         @if (needsSetup && Model.WorkflowDraftId is { } workflowId)
         {
-            <a class="btn btn-welcome" asp-controller="Workflows" asp-action="Details" asp-route-id="@workflowId">Süreç taslağını aç</a>
+            <a class="btn btn-primary" asp-controller="Workflows" asp-action="Edit" asp-route-id="@workflowId">Süreç taslağına devam et</a>
         }
         else if (needsSetup)
         {
-            <a class="btn btn-welcome" asp-controller="Workflows" asp-action="Create">Süreç oluştur</a>
-            <a class="btn btn-welcome" asp-controller="Workflows" asp-action="Designer">Görsel tasarımcıyı aç</a>
+            <a class="btn btn-primary" asp-controller="Workflows" asp-action="Designer">Yeni akış tasarla</a>
         }
         else if (Model.AssignedApprovals > 0)
         {
-            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Inbox">Bekleyen onayları aç</a>
+            <a class="btn btn-primary" asp-controller="Requests" asp-action="Inbox">Bekleyen onayları aç</a>
         }
         else if (showManagementQueue)
         {
-            <a class="btn btn-welcome" asp-controller="Requests" asp-action="All" asp-route-status="@RequestStatus.Pending">Bekleyen talepleri aç</a>
+            <a class="btn btn-primary" asp-controller="Requests" asp-action="All" asp-route-status="@RequestStatus.Pending">Bekleyen talepleri aç</a>
         }
         else if (Model.RequestDraft is { } draft)
         {
-            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Details" asp-route-id="@draft.Id" asp-route-scope="Mine">Talep taslağını aç</a>
+            <a class="btn btn-primary" asp-controller="Requests" asp-action="Details" asp-route-id="@draft.Id" asp-route-scope="Mine">Talep taslağını aç</a>
         }
         else if (Model.HasActiveWorkflow)
         {
-            <a class="btn btn-welcome" asp-controller="Requests" asp-action="Create">Talep oluştur</a>
+            <a class="btn btn-primary" asp-controller="Requests" asp-action="Create">Talep oluştur</a>
+        }
+        @if (!needsSetup && Model.AllPendingRequests.HasValue)
+        {
+            <a class="btn btn-outline-primary" asp-controller="Workflows" asp-action="Designer">Yeni akış tasarla</a>
         }
     </div>
+    </div>
+    @if (Model.ShowApprovalCard || Model.AllPendingRequests.HasValue)
+    {
+        <dl class="home-overview" aria-label="İş özeti">
+            @if (Model.ShowApprovalCard) { <div><dt>Size atanan</dt><dd>@Model.AssignedApprovals</dd></div> }
+            @if (Model.AllPendingRequests is { } pending) { <div><dt>Toplam bekleyen</dt><dd>@pending</dd></div> }
+        </dl>
+    }
 </section>
 
 @if (needsSetup)
@@ -52,9 +64,9 @@
     <section class="surface-card workspace-section" aria-labelledby="first-workflow-title">
         <h2 id="first-workflow-title" class="h5">İlk masraf onayını deneyin</h2>
         <ol class="home-steps mb-0">
-            <li><a asp-controller="Users" asp-action="Index">Kullanıcı yönetimi</a> ekranında talebi gönderecek kişiye <strong>Çalışan</strong>, karar verecek kişiye <strong>Onaylayıcı</strong> rolünü verin. Bu örnek için iki ayrı hesap kullanın.</li>
-            <li><a asp-controller="Workflows" asp-action="Index">Süreç tanımları</a> ekranında <strong>Masraf onayı</strong> adında bir süreç oluşturun. <strong>Masrafı incele</strong> adımını ekleyip rol olarak <strong>Onaylayıcı</strong> seçin. <strong>Taslağı kaydet</strong> ve ardından <strong>Yayımla</strong> düğmesine basın.</li>
-            <li>Çalışan hesabıyla <strong>Talep oluştur → Taslağı kaydet → Onaya gönder</strong> adımlarını izleyin. Onaylayıcı hesabıyla <strong>Bekleyen onaylar → İncele</strong> yolundan karar verin.</li>
+            <li><a asp-controller="Workflows" asp-action="Designer" asp-route-ornek="masraf">10.000 TL masraf örneğini aç</a>. Karar adımına tıklayarak 10.000 TL ve altındaki taleplerin hangi yolu izlediğini ve hangi taleplerin onaya gittiğini gör.</li>
+            <li><strong>Teste geç → Kaydet ve test et</strong> ile iki yolu dene. <a asp-controller="Users" asp-action="Index">Kullanıcı yönetimi</a> ekranında talebi gönderecek kişiye <strong>Çalışan</strong>, karar verecek kişiye <strong>Onaylayıcı</strong> rolünü ver.</li>
+            <li>Süreç detayında <strong>Yayımla</strong> düğmesine bas. Çalışan talep gönderdiğinde karar gereken talepler onaylayıcının <strong>Bekleyen onaylar</strong> listesine düşer.</li>
         </ol>
     </section>
 }
@@ -94,10 +106,3 @@
         }
     </div>
 </section>
-@if (Model.AllPendingRequests.HasValue)
-{
-    <section class="workspace-section" aria-labelledby="management-title">
-        <div class="section-heading"><h2 id="management-title">Yönetim</h2><p>Hesapları, süreçleri ve yönetim işlemlerini takip edin.</p></div>
-        <partial name="_ManagementShortcuts" />
-    </section>
-}

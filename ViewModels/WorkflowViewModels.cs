@@ -57,11 +57,14 @@ public sealed class WorkflowConditionViewModel
 public sealed class WorkflowListViewModel
 {
     public string? Search { get; set; }
+    public WorkflowListState State { get; set; }
     public int Page { get; set; }
     public int TotalPages { get; set; }
     public int TotalCount { get; set; }
     public List<WorkflowListItem> Items { get; set; } = [];
 }
+
+public enum WorkflowListState { All, Active, Draft, Archived }
 
 public sealed class WorkflowListItem
 {
@@ -71,7 +74,7 @@ public sealed class WorkflowListItem
     public int Version { get; set; }
     public bool IsActive { get; set; }
     public bool IsPublished { get; set; }
-    public int StepCount { get; set; }
+    public bool IsGraph { get; set; }
 }
 
 public sealed class WorkflowCommandViewModel

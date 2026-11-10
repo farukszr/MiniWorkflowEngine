@@ -45,8 +45,8 @@ internal static partial class AuthenticationChecks
         var entity = await db.WorkflowDefinitions.AsNoTracking().Include(x => x.Steps).ThenInclude(x => x.Conditions).SingleAsync();
         var id = entity.Id;
         var draftHome = WebUtility.HtmlDecode(await adminClient.GetStringAsync("/"));
-        Require(draftHome.Contains($"/Workflows/Details/{id}") && draftHome.Contains("Süreç taslağını aç"),
-            "İlk süreç taslakken ana sayfa taslağın detayına yönlendirmeli.");
+        Require(draftHome.Contains($"/Workflows/Edit/{id}") && draftHome.Contains("Süreç taslağına devam et"),
+            "İlk süreç taslakken ana sayfa doğrudan taslağın düzenleyicisini açmalı.");
         Require(entity.Code == "EXPENSE_APPROVAL" && entity.Version == 1 && !entity.IsActive && entity.PublishedAt is null &&
             entity.Steps.Count == 2 && entity.Steps.Single(x => x.Order == 2).Conditions.Any(x => x.Value == "1000.50"),
             "Taslak, sıralı adımlar ve normalize koşullar kaydedilmeli.");
@@ -92,11 +92,19 @@ internal static partial class AuthenticationChecks
         var clone = await db.WorkflowDefinitions.AsNoTracking().Include(x => x.Steps).ThenInclude(x => x.Conditions).SingleAsync(x => x.Version == 2);
         Require(!clone.IsActive && clone.PublishedAt is null && clone.Steps.Count == 2 && clone.Steps.Sum(x => x.Conditions.Count) == 2,
             "Yeni sürüm adım ve koşulları bağımsız kopyalamalı.");
+        var activeList = await adminClient.GetStringAsync("/Workflows?state=Active");
+        var draftList = await adminClient.GetStringAsync("/Workflows?state=Draft&search=EXPENSE_APPROVAL");
+        Require(activeList.Contains($"href=\"/Workflows/Details/{id}\"") && !activeList.Contains($"href=\"/Workflows/Details/{clone.Id}\"") &&
+            draftList.Contains($"href=\"/Workflows/Details/{clone.Id}\"") && !draftList.Contains($"href=\"/Workflows/Details/{id}\""),
+            "Etkin ve taslak süreç filtreleri aramayla birlikte doğru sürümleri göstermeli.");
         await WorkflowCommandAsync(adminClient, id, "NewVersion", Convert.ToBase64String(entity.RowVersion));
         Require(await db.WorkflowDefinitions.CountAsync() == 2, "Bir süreç için ikinci açık taslak oluşturulmamalı.");
         await WorkflowCommandAsync(adminClient, clone.Id, "Publish", Convert.ToBase64String(clone.RowVersion));
         Require(await db.WorkflowDefinitions.CountAsync(x => x.IsActive) == 1 && await db.WorkflowDefinitions.AnyAsync(x => x.Id == clone.Id && x.IsActive),
             "Yayımlama eski sürümü arşivleyip tek etkin sürümü korumalı.");
+        var archivedList = await adminClient.GetStringAsync("/Workflows?state=Archived");
+        Require(archivedList.Contains($"href=\"/Workflows/Details/{id}\"") && !archivedList.Contains($"href=\"/Workflows/Details/{clone.Id}\""),
+            "Arşiv filtresi yalnızca arşivlenen sürümü göstermeli.");
         Require(await db.WorkflowRequests.AnyAsync(x => x.WorkflowDefinitionId == id), "Eski talep eski sürümünde kalmalı.");
         Console.WriteLine("BAŞARILI: Yayımlama, değişmez tanım, bağımsız yeni sürüm, tek etkin sürüm ve eski talep bağlantısı.");
 

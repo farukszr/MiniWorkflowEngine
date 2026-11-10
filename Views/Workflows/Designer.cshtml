@@ -1,107 +1,236 @@
 @model MiniWorkflowEngine.ViewModels.GraphEditorViewModel
 @using Microsoft.AspNetCore.Mvc.Rendering
+@using MiniWorkflowEngine.Domain
 @{
     ViewData["Title"] = "Görsel süreç tasarımcısı";
     var readOnly = ViewData["ReadOnly"] is true;
     var roles = (List<SelectListItem>)ViewData["Roles"]!;
     var users = (List<SelectListItem>)ViewData["Users"]!;
     var departments = (List<SelectListItem>)ViewData["Departments"]!;
+    var approverRoleId = roles.FirstOrDefault(role => role.Text == ApplicationRoles.DisplayName(ApplicationRoles.Approver))?.Value;
 }
-<section class="my-4">
-    <a asp-action="Index" class="small text-decoration-none">← Süreç tanımlarına dön</a>
-    <div class="page-heading mt-3"><div><span class="eyebrow">YÖNETİM / SÜREÇ VE FORM</span><h1 class="h2 mt-2">Görsel süreç tasarımcısı</h1></div>
-        <span class="role-badge">@(readOnly ? "Yayımlanmış sürüm" : "Taslak")</span>
-    </div>
-    <form asp-action="Designer" asp-route-id="@(Model.Id == 0 ? null : (int?)Model.Id)" method="post" id="graph-editor" data-readonly="@readOnly.ToString().ToLowerInvariant()">
-        <input asp-for="Id" type="hidden" /><input asp-for="RowVersion" type="hidden" /><input asp-for="GraphJson" type="hidden" />
-        <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
-        <div class="surface-card mt-3">
-            <div class="row g-3">
-                <div class="col-md-4"><label asp-for="Code" class="form-label"></label><input asp-for="Code" class="form-control" readonly="@(Model.Id != 0)" maxlength="50" /></div>
-                <div class="col-md-8"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" readonly="@readOnly" maxlength="150" /></div>
-                <div class="col-12"><label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control" readonly="@readOnly" maxlength="2000"></textarea></div>
-            </div>
+<form asp-action="Designer" asp-route-id="@(Model.Id == 0 ? null : (int?)Model.Id)" method="post" id="graph-editor" class="studio" data-readonly="@readOnly.ToString().ToLowerInvariant()">
+    <input asp-for="Id" type="hidden" /><input asp-for="RowVersion" type="hidden" /><input asp-for="GraphJson" type="hidden" />
+    <header class="studio-header">
+        <div class="studio-heading">
+            <a asp-action="Index" class="studio-back">← Süreçler</a>
+            <div><span class="studio-eyebrow">SÜREÇ TASARIMCISI</span><h1>@(Model.Id == 0 ? "Yeni süreç" : Model.Name)</h1></div>
+            <span class="studio-status">@(readOnly ? "Yayımlanmış" : "Taslak")</span>
         </div>
-        <div class="surface-card mt-3">
-            <h2 class="h5">İş akışı</h2>
-            <p class="small text-muted">Paletten düğüm ekleyin veya tuvale sürükleyin. Düğümü seçerek özelliklerini, iki düğüm seçerek bağlantılarını düzenleyin.</p>
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                @if (!readOnly)
-                {
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="start" draggable="true">+ Başlangıç</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="task" draggable="true">+ Kullanıcı görevi</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="approval" draggable="true">+ Onay</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="decision" draggable="true">+ Karar</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-node="end" draggable="true">+ Bitiş</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-undo">Geri al</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-redo">Yinele</button>
-                }
-                <label class="small d-flex align-items-center gap-2">Yakınlaştır <input id="graph-zoom" type="range" min="50" max="150" value="100" /></label>
-            </div>
-            <div class="graph-workspace">
-                <div class="graph-viewport" id="graph-viewport" tabindex="0" aria-label="İş akışı tuvali">
-                    <div class="graph-canvas" id="graph-canvas"><svg class="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div></div>
-                </div>
-                <div class="graph-inspector">
-                    <h3 class="h6">Düğüm özellikleri</h3>
-                    <p id="graph-no-selection" class="small text-muted">Tuvalden bir düğüm seçin.</p>
-                    <fieldset id="graph-node-properties" hidden disabled="@readOnly">
-                        <label class="form-label d-block">Düğüm adı<input class="form-control" id="node-name" maxlength="150" /></label>
-                        <div class="row g-2 mb-2">
-                            <label class="col-6 small">Yatay konum<input class="form-control" id="node-x" type="number" min="0" max="6000" /></label>
-                            <label class="col-6 small">Dikey konum<input class="form-control" id="node-y" type="number" min="0" max="6000" /></label>
-                        </div>
-                        <div id="node-assignment">
-                            <label class="form-label d-block">Sorumlu rol<select id="node-role" class="form-select"><option value="">Rol seçin</option>@foreach (var role in roles) { <option value="@role.Value">@role.Text</option> }</select></label>
-                            <label class="form-label d-block">Departman<select id="node-department" class="form-select"><option value="">Tüm departmanlar</option>@foreach (var dept in departments) { <option value="@dept.Value">@dept.Text</option> }</select></label>
-                            <label class="form-label d-block">Atanan kullanıcı<select id="node-user" class="form-select"><option value="">Role göre ata</option>@foreach (var user in users) { <option value="@user.Value">@user.Text</option> }</select></label>
-                            <label class="form-check mb-2"><input type="checkbox" id="node-return" class="form-check-input" /> Düzeltme için iade edilebilir</label>
-                        </div>
-                        <label id="node-end" class="form-label">Süreç sonucu<select class="form-select" id="node-outcome"><option value="completed">Tamamlandı</option><option value="rejected">Reddedildi</option></select></label>
-                        @if (!readOnly) { <button type="button" id="node-remove" class="btn btn-outline-danger btn-sm">Düğümü ve bağlantılarını sil</button> }
-                    </fieldset>
-                </div>
-            </div>
-            <h3 class="h6 mt-3">Bağlantılar</h3>
+        <div class="studio-actions">
+            @if (Model.Id != 0) { <a asp-action="Details" asp-route-id="@Model.Id" class="studio-detail">Süreç detayı</a> }
             @if (!readOnly)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm mb-2" id="route-pick">Tuvalden iki düğüm seç</button>
-                <p class="small text-muted">Bir karar düğümünde ilk eşleşen koşul kullanılır. Bağlantı sırasını listeden değiştirebilirsiniz.</p>
-                <div class="row g-2 align-items-end mb-3">
-                    <label class="col-md-4 small">Kaynak düğüm<select class="form-select" id="route-from"></select></label>
-                    <label class="col-md-4 small">Hedef düğüm<select class="form-select" id="route-to"></select></label>
-                    <label class="col-md-4 small">Geçiş türü<select class="form-select" id="route-kind"></select></label>
-                    <div id="route-rule" class="row g-2 m-0 p-0" hidden>
-                        <label class="col-md-4 small">Değişken<select id="route-variable" class="form-select"></select></label>
-                        <label class="col-md-4 small">Karşılaştırma<select id="route-operator" class="form-select">
-                            <option value="equals">Eşittir</option><option value="notEquals">Eşit değildir</option><option value="greaterThan">Büyüktür</option><option value="greaterThanOrEqual">Büyük veya eşittir</option><option value="lessThan">Küçüktür</option><option value="lessThanOrEqual">Küçük veya eşittir</option>
-                        </select></label>
-                        <label class="col-md-4 small">Karşılaştırma değeri<input id="route-value" class="form-control" maxlength="250" /></label>
-                    </div>
-                    <div class="col-12"><button type="button" class="btn btn-outline-primary btn-sm" id="route-save">Bağlantı ekle</button> <button type="button" class="btn btn-outline-secondary btn-sm" id="route-cancel" hidden>Vazgeç</button></div>
-                </div>
+                <button class="btn btn-outline-secondary btn-sm" id="graph-save" disabled>Taslağı kaydet</button>
+                <button type="button" class="btn btn-primary btn-sm" id="graph-open-test">Teste geç →</button>
             }
-            <ol id="graph-routes" class="graph-routes mb-0"></ol>
         </div>
-        <div class="surface-card mt-3">
-            <h2 class="h5">Form tasarımcısı</h2>
-            <p class="small text-muted">Alanları sürükleyerek sıralayın. Değişken anahtarı karar kurallarında kullanılır. Başlık, açıklama, tutar ve departman standart alanlardır.</p>
-            @if (!readOnly)
-            {
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    <select class="form-select w-auto" id="field-kind" aria-label="Alan türü"><option value="text">Metin</option><option value="longText">Uzun metin</option><option value="number">Sayı</option><option value="amount">Tutar</option><option value="date">Tarih</option><option value="checkbox">Onay kutusu</option><option value="choice">Seçenek listesi</option></select>
-                    <button type="button" class="btn btn-outline-primary" id="field-add" draggable="true">+ Alan ekle</button>
-                </div>
-            }
-            <div id="graph-fields" class="graph-fields"></div>
+    </header>
+    @if (!readOnly)
+    {
+        <ol class="studio-journey" aria-label="Süreci kullanıma açma adımları">
+            <li id="studio-stage-design" aria-current="step"><span>1</span><div><strong>Tasarla</strong><small>Adımları ekle ve bağla.</small></div></li>
+            <li id="studio-stage-preview"><span>2</span><div><strong>Dene</strong><small>Örnek bir taleple yolu kontrol et.</small></div></li>
+            <li><span>3</span><div><strong>Yayımla</strong><small>Çalışanlar talep gönderebilsin.</small></div></li>
+        </ol>
+    }
+    <div class="studio-subheader">
+        <div class="designer-tabs" role="tablist" aria-label="Tasarım çalışma alanı">
+            <button id="designer-tab-flow" type="button" role="tab" aria-selected="true" aria-controls="designer-flow">Akışı kur</button>
+            <button id="designer-tab-form" type="button" role="tab" aria-selected="false" aria-controls="designer-form" tabindex="-1">Form <small>isteğe bağlı</small></button>
+            <button id="designer-tab-test" type="button" role="tab" aria-selected="false" aria-controls="designer-test" tabindex="-1">Test et</button>
         </div>
-        <p class="small text-danger mt-2 mb-0" id="graph-message" role="status"></p>
         @if (!readOnly)
         {
-            <noscript><p class="text-danger mt-3">Tasarımcı için JavaScript gereklidir.</p></noscript>
-            <button class="btn btn-primary mt-3" id="graph-save" disabled>Taslağı kaydet</button>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-undo">Geri al</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-redo">Yinele</button>
+            </div>
         }
-        @if (Model.Id != 0) { <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary mt-3">Süreç detayına dön</a> }
-    </form>
-</section>
+    </div>
+    <div asp-validation-summary="All" class="studio-validation text-danger validation-summary" role="alert"></div>
+    <noscript><p class="text-danger p-3">Tasarımcı için JavaScript gereklidir.</p></noscript>
+    <section id="designer-flow" role="tabpanel" aria-labelledby="designer-tab-flow" tabindex="0">
+        <div class="graph-workspace">
+            <aside class="studio-library">
+                <div class="studio-name">
+                    <label asp-for="Name" class="form-label fw-semibold"></label>
+                    <input asp-for="Name" class="form-control" readonly="@readOnly" maxlength="150" placeholder="Örn. Bilgisayar alım onayı" />
+                    <span asp-validation-for="Name" class="small text-danger"></span>
+                </div>
+                <h2>Adım ekle</h2>
+                @if (!readOnly)
+                {
+                    <p>Tıkla ya da tuvale sürükle.</p>
+                    <div class="studio-palette">
+                        <div class="studio-palette-group">
+                            <h3>Başlangıç ve bitiş</h3>
+                            <button type="button" data-add-node="start" draggable="true"><span aria-hidden="true">○</span>Başlangıç</button>
+                            <button type="button" data-add-node="end" draggable="true"><span aria-hidden="true">◉</span>Tamamlandı</button>
+                            <button type="button" data-add-node="end" data-outcome="rejected" draggable="true"><span aria-hidden="true">×</span>Reddedildi</button>
+                        </div>
+                        <div class="studio-palette-group">
+                            <h3>Görevler</h3>
+                            <button type="button" data-add-node="task" draggable="true"><span aria-hidden="true">▤</span>Kullanıcı görevi</button>
+                            <button type="button" data-add-node="approval" draggable="true"><span aria-hidden="true">✓</span>Onay</button>
+                        </div>
+                        <div class="studio-palette-group">
+                            <h3>Karar</h3>
+                            <button type="button" data-add-node="decision" draggable="true"><span aria-hidden="true">◇</span>Koşullu karar</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p>Yayımlanan akışı inceleyebilirsin. Düğüm ayrıntıları için tuvalden seçim yap.</p>
+                }
+                <details class="studio-process" open="@(!ViewData.ModelState.IsValid && !string.IsNullOrWhiteSpace(Model.Code))">
+                    <summary>Süreç bilgileri</summary>
+                    <label asp-for="Code" class="form-label"></label><input asp-for="Code" class="form-control" readonly="@(Model.Id != 0)" maxlength="50" placeholder="Otomatik oluşturulur" />
+                    <span asp-validation-for="Code" class="small text-danger"></span>
+                    <label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control" readonly="@readOnly" maxlength="2000"></textarea>
+                </details>
+            </aside>
+            <div class="studio-stage">
+                <div class="studio-canvas-toolbar">
+                    <div>
+                        <strong>İş akışı</strong>
+                        @if (!readOnly) { <p class="mb-0 text-muted">Bir çıkışı sürükle veya çıkışa tıklayıp hedefi seç.</p> }
+                        <p id="graph-message" class="mb-0" role="status"></p>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        @if (!readOnly) { <button type="button" id="graph-cancel-link" class="btn btn-outline-secondary btn-sm" hidden>Bağlantıyı iptal et</button> }
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-fit">Tuvale sığdır</button>
+                        <label class="studio-zoom"><span class="visually-hidden">Yakınlaştır</span><input id="graph-zoom" type="range" min="5" max="150" value="100" /><output id="graph-zoom-value" for="graph-zoom">%100</output></label>
+                    </div>
+                </div>
+                <div class="studio-canvas-area">
+                    <div class="graph-viewport" id="graph-viewport" tabindex="0" aria-label="İş akışı tuvali">
+                        <div class="graph-canvas" id="graph-canvas"><svg class="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div></div>
+                    </div>
+                    @if (!readOnly)
+                    {
+                        <div class="studio-empty" id="graph-starter">
+                            <span class="studio-empty-icon" aria-hidden="true">◇</span>
+                            <h2>Nasıl başlamak istersin?</h2>
+                            <p>Hazır bir onay akışını düzenleyebilir veya boş tuvale kendi adımlarını ekleyebilirsin.</p>
+                            <div class="d-flex flex-wrap justify-content-center gap-2">
+                                <button type="button" class="btn btn-primary btn-sm" id="graph-start-expense" data-role-id="@approverRoleId">10.000 TL masraf örneği</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="graph-start-approval">Tek adımlı onayla başla</button>
+                                <button type="button" class="btn btn-link btn-sm" id="graph-start-blank">Başlangıç ekle</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="studio-canvas-footer">
+                    <span id="graph-summary"></span>
+                </div>
+            </div>
+            <aside class="graph-inspector">
+                <h2>Adım ayarları</h2>
+                @if (!readOnly)
+                {
+                    <section id="graph-target-picker" class="studio-inspector-section" hidden>
+                        <label class="small d-block mb-2" for="graph-target">Hangi adıma gitsin?</label>
+                        <select class="form-select mb-2" id="graph-target"></select>
+                        <button class="btn btn-primary btn-sm" type="button" id="graph-target-connect">Bağla</button>
+                    </section>
+                }
+                <section id="graph-connection-settings" class="studio-inspector-section" hidden>
+                    <h3>Bu yol ne zaman çalışsın?</h3>
+                    <p id="route-description" class="small text-muted"></p>
+                    <div id="route-rule">
+                        <label class="small d-block mb-2">Kontrol edilecek alan<select id="route-variable" class="form-select"></select></label>
+                        <label class="small d-block mb-2">Karşılaştırma<select id="route-operator" class="form-select">
+                            <option value="equals">Eşittir</option><option value="notEquals">Eşit değildir</option><option value="greaterThan">Büyüktür</option><option value="greaterThanOrEqual">Büyük veya eşittir</option><option value="lessThan">Küçüktür</option><option value="lessThanOrEqual">Küçük veya eşittir</option>
+                        </select></label>
+                        <div id="route-value-entry" class="mb-2">
+                            <label for="route-value" class="small">Değer</label><input id="route-value" class="form-control" maxlength="250" />
+                        </div>
+                        <div id="route-value-selection" class="mb-2" hidden>
+                            <label for="route-value-options" class="small">Değer</label><select id="route-value-options" class="form-select"></select>
+                        </div>
+                    </div>
+                    <p id="route-preview" class="decision-rule-preview small" aria-live="polite"></p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="route-save">Koşulu kaydet</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="route-cancel">Vazgeç</button>
+                    </div>
+                </section>
+                <section id="decision-guide" class="studio-inspector-section decision-guide" hidden>
+                    <h3>Karar yolları</h3>
+                    <p class="small text-muted">Önce bir koşul yolu kur. Kural sağlanmazsa talep varsayılan yoldan ilerler.</p>
+                    <div class="decision-branch">
+                        <strong>1. Koşul sağlanırsa</strong>
+                        <span id="decision-match-status" class="small text-muted"></span>
+                        @if (!readOnly)
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="decision-edit-rule" hidden>Koşulu düzenle</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="decision-match-target" data-decision-output="match">Koşul hedefini seç</button>
+                        }
+                    </div>
+                    <div class="decision-branch">
+                        <strong>2. Diğer tüm durumlar</strong>
+                        <span id="decision-default-status" class="small text-muted"></span>
+                        @if (!readOnly) { <button type="button" class="btn btn-outline-primary btn-sm" data-decision-output="otherwise">Varsayılan hedefi seç</button> }
+                    </div>
+                </section>
+                <p id="graph-no-selection" class="small text-muted">Ayarlarını görmek için tuvalden bir düğüm seç.</p>
+                <fieldset id="graph-node-properties" hidden disabled="@readOnly">
+                    <legend class="h6">Düğüm özellikleri</legend>
+                    <label class="form-label d-block">Düğüm adı<input class="form-control" id="node-name" maxlength="150" /></label>
+                    <div id="node-assignment">
+                        <label class="form-label d-block">Sorumlu rol<select id="node-role" class="form-select"><option value="">Rol seçin</option>@foreach (var role in roles) { <option value="@role.Value">@role.Text</option> }</select></label>
+                        <label class="form-label d-block">Departman<select id="node-department" class="form-select"><option value="">Tüm departmanlar</option>@foreach (var dept in departments) { <option value="@dept.Value">@dept.Text</option> }</select></label>
+                        <label class="form-label d-block">Atanan kullanıcı<select id="node-user" class="form-select"><option value="">Role göre ata</option>@foreach (var user in users) { <option value="@user.Value">@user.Text</option> }</select></label>
+                        <label class="form-check mb-2"><input type="checkbox" id="node-return" class="form-check-input" /> Düzeltme için iade edilebilir</label>
+                    </div>
+                    <label id="node-end" class="form-label">Süreç sonucu<select class="form-select" id="node-outcome"><option value="completed">Tamamlandı</option><option value="rejected">Reddedildi</option></select></label>
+                    <details class="studio-inspector-section mb-2">
+                        <summary>Konum</summary>
+                        <div class="row g-2 mt-1">
+                            <label class="col-6 small">Yatay<input class="form-control" id="node-x" type="number" min="0" max="6000" /></label>
+                            <label class="col-6 small">Dikey<input class="form-control" id="node-y" type="number" min="0" max="6000" /></label>
+                        </div>
+                    </details>
+                    @if (!readOnly) { <button type="button" id="node-remove" class="btn btn-outline-danger btn-sm">Düğümü sil</button> }
+                </fieldset>
+                @if (!readOnly)
+                {
+                    <div class="studio-inspector-section" id="graph-append" hidden>
+                        <label class="small d-block mb-2">Sonraki düğüm
+                            <select class="form-select" id="graph-append-kind">
+                                <option value="task">Kullanıcı görevi</option><option value="approval">Onay</option><option value="decision">Karar</option><option value="end">Tamamlandı</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="graph-append-add">Bağlı adım ekle</button>
+                    </div>
+                }
+                <details class="studio-inspector-section" id="graph-connection-list">
+                    <summary>Bağlantılar <span id="graph-connection-count" class="text-muted small"></span></summary>
+                    <ol id="graph-routes" class="graph-routes mb-0"></ol>
+                </details>
+            </aside>
+        </div>
+    </section>
+    <section class="surface-card studio-content" id="designer-form" role="tabpanel" aria-labelledby="designer-tab-form" tabindex="0" hidden>
+        <h2 class="h5">Talep formu</h2>
+        <p class="small text-muted">Başlık, açıklama, tutar ve departman hazır gelir. İhtiyacın varsa ek alan oluştur ve bunları sürükleyerek sırala. Ek alanları karar kurallarında da kullanabilirsin.</p>
+        @if (!readOnly)
+        {
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <select class="form-select w-auto" id="field-kind" aria-label="Alan türü"><option value="text">Metin</option><option value="longText">Uzun metin</option><option value="number">Sayı</option><option value="amount">Tutar</option><option value="date">Tarih</option><option value="checkbox">Onay kutusu</option><option value="choice">Seçenek listesi</option></select>
+                <button type="button" class="btn btn-outline-primary" id="field-add" draggable="true">+ Alan ekle</button>
+            </div>
+        }
+        <div id="graph-fields" class="graph-fields"></div>
+    </section>
+    <section class="surface-card studio-content" id="designer-test" role="tabpanel" aria-labelledby="designer-tab-test" tabindex="0" hidden>
+        <h2 class="h5">Örnek değerlerle test et</h2>
+        <p class="text-muted">Önizlemede bir örnek tutar veya form değeri gir. Uygulama ilk görev adımını ya da talebin nasıl tamamlanacağını gösterir.</p>
+        @if (!readOnly) { <p class="text-muted">Bu işlem akışı taslak olarak kaydeder. Sonucu kontrol ettikten sonra <strong>Yayımlamaya geç</strong> düğmesiyle son adıma ilerle.</p> }
+        @if (readOnly) { <a asp-action="GraphPreview" asp-route-id="@Model.Id" class="btn btn-primary">Süreç önizleme</a> }
+        else { <button type="submit" name="next" value="preview" id="graph-test-save" class="btn btn-primary" disabled>Kaydet ve test et</button> }
+    </section>
+</form>
 @section Scripts { <script src="~/js/graph-designer.js" asp-append-version="true"></script> }

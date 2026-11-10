@@ -25,7 +25,7 @@
                 else
                 {
                     var workflow = Model.Workflows.FirstOrDefault(x => x.Id == Model.WorkflowDefinitionId);
-                    <input asp-for="WorkflowDefinitionId" type="hidden" /><p class="form-control bg-light mb-0">@workflow?.Name · v@(workflow?.Version)</p>
+                    <input asp-for="WorkflowDefinitionId" type="hidden" /><p class="form-control mb-0">@workflow?.Name · v@(workflow?.Version)</p>
                 }
                 <span asp-validation-for="WorkflowDefinitionId" class="text-danger small"></span><p id="process-help" class="small text-muted mt-2">Tutar veya departman koşulu olan süreçlerde bu alanlar onaya gönderirken zorunludur.</p>
             </div>

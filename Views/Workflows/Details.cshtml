@@ -6,6 +6,14 @@
     <div class="page-heading mt-3"><div><span class="eyebrow">@Model.Code · v@(Model.Version)</span><h1 class="h2 mt-2">@Model.Name</h1></div><span class="role-badge">@(Model.IsActive ? "Etkin" : Model.IsPublished ? "Arşiv" : "Taslak")</span></div>
     @if (TempData["Success"] is string success) { <div class="alert alert-success mt-3" role="status">@success</div> }
     @if (TempData["Error"] is string error) { <div class="alert alert-danger mt-3" role="alert">@error</div> }
+    @if (Model.CanEdit)
+    {
+        <div class="work-next mt-3"><p><strong>Süreç taslakta</strong> Akışı kontrol ettikten sonra <strong>Yayımla</strong> düğmesine bas. Çalışanlar bu süreci <strong>Talep oluştur</strong> ekranında seçebilecek.</p></div>
+    }
+    else if (Model.IsActive)
+    {
+        <div class="work-next mt-3"><p><strong>Süreç kullanımda</strong> Çalışanlar bu süreçten talep gönderebilir.</p><a asp-controller="Requests" asp-action="Create" class="btn btn-outline-primary btn-sm">Talep formunu aç</a></div>
+    }
     @if (ViewData["UnstaffedSteps"] is string[] { Length: > 0 } unstaffed)
     {
         <div class="alert alert-warning mt-3" role="status">Şu adımlara uygun kullanıcı atanmadı: @string.Join(", ", unstaffed).</div>
@@ -25,7 +33,7 @@
             @if (Model.CanEdit)
             {
                 @if (!Model.IsGraph) { <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Taslağı düzenle</a> }
-                <form asp-action="Publish" asp-route-id="@Model.Id" method="post"><input type="hidden" name="Id" value="@Model.Id" /><input type="hidden" name="RowVersion" value="@Model.RowVersion" /><button class="btn btn-outline-primary">Yayımla</button></form>
+                <form asp-action="Publish" asp-route-id="@Model.Id" method="post"><input type="hidden" name="Id" value="@Model.Id" /><input type="hidden" name="RowVersion" value="@Model.RowVersion" /><button class="btn btn-primary">Yayımla</button></form>
             }
             else
             {

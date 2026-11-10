@@ -13,5 +13,6 @@ public sealed class GraphPreviewViewModel
     [BindNever] public string Name { get; set; } = "";
     [BindNever] public GraphField[] Fields { get; set; } = [];
     [BindNever] public string? Result { get; set; }
+    [BindNever] public bool IsDraft { get; set; }
     [BindNever] public List<string> Route { get; set; } = [];
 }

@@ -70,18 +70,23 @@ Giriş ekranına 3. adımda belirlediğin e-posta adresini ve parolayı yaz. **G
 düğmesine bas. Henüz yayımlanmış bir süreç yoksa **Ana Sayfa** ilk kurulumu adım adım
 gösterir. [Giriş ekranını aç](https://localhost:7062/Account/Login)
 
-### Ekran görüntüleri
+### 5. İlk görsel süreci dene
 
-[Örnek masraf onayı akışının ekran görüntülerini inceleyin](docs/screenshots/README.md).
+1. **Yeni akış tasarla** düğmesine bas. Boş tuvalde **10.000 TL masraf örneği** seçeneğini aç. Süreç adını değiştirebilirsin. Süreç kodunu boş bırakırsan uygulama kaydederken oluşturur.
+2. Karar düğümünü seç ve **Koşulu düzenle** ile **Tutar → Büyüktür → 10000** kuralını gör. **Karar yolları** panelinde kuralın ve varsayılan yolun hedefleri yer alır.
+3. **Teste geç → Kaydet ve test et** ile örneği taslak olarak kaydet. **Süreç önizleme** ekranında **Örnek tutar** alanına önce `15000`, sonra `10000` yaz ve her seferinde **Önizle**'ye bas. İlk tutar **Masrafı incele** adımına gider, ikinci tutar doğrudan tamamlanır.
+4. Çalışanların bu süreci kullanmasını istediğinde **Yayımlamaya geç → Yayımla** yolunu izle. Çalışan menüdeki **Talep oluştur** ile süreci seçer, formu doldurur ve **Taslağı kaydet**'e basar. Talep detayında **Onaya gönder** dediğinde 10.000 TL üzerindeki talep, **Onaylayıcı** rolündeki kullanıcıların **Bekleyen onaylar** listesine düşer.
+
+[Tasarım, önizleme ve talep ekranlarını incele](docs/screenshots/README.md).
 
 ## Özellikler
 
-- **Süreç tanımları → Görsel süreç oluştur** ile başlangıç, kullanıcı görevi, onay, karar ve bitiş düğümlerini bağlama.
+- **Süreç tanımları → Yeni akış tasarla** ile başlangıç, kullanıcı görevi, onay, karar ve bitiş düğümlerini bağlama.
 - Aynı tasarım ekranında dinamik form alanları oluşturma ve bu alanları karar değişkeni olarak kullanma.
 - Süreç detayındaki **Süreç önizleme** ile örnek değerlerden ilk görevi veya bitişi görme.
-- **Departmanlar** üzerinden birim oluşturma ve kullanıcı üyeliği atama. Görevleri role, departmana ve kişiye göre sınırlandırma.
-- **Kullanıcı yönetimi → Görev rolleri** ile kuruma özel roller oluşturma ve bunları süreç adımlarında kullanma.
-- **Raporlar** üzerinden süreç, departman, tarih ve durum bazında talep sayısı, gecikme ve ortalama kapanış süresi.
+- **Yönetim → Departmanlar** üzerinden birim oluşturma ve kullanıcı üyeliği atama. Görevleri role, departmana ve kişiye göre sınırlandırma.
+- **Yönetim → Kullanıcı yönetimi → Görev rolleri** ile kuruma özel roller oluşturma ve bunları süreç adımlarında kullanma.
+- **Yönetim → Raporlar** üzerinden süreç, departman, tarih ve durum bazında talep sayısı, gecikme ve ortalama kapanış süresi.
 - Dinamik ve sürümlü süreç tanımları; taslak, yayımlama ve arşivleme.
 - Sıralı onay adımları; tutar/departman koşulları ve otomatik adım atlama.
 - Kayıtlı süreç sürümünde örnek tutar ve departmanla önizleme.
@@ -97,12 +102,11 @@ gösterir. [Giriş ekranını aç](https://localhost:7062/Account/Login)
 - Eski form/çift karar koruması; durum ve geçmişi birlikte kaydeden transaction.
 - Türkçe, responsive Razor arayüzü.
 
-### Görsel bir süreç yayımlama
+### Kendi görsel sürecini tasarla
 
-1. Başlangıçtan sonraki düğüme **İlerle** bağlantısı ekleyin. Kullanıcı görevinde rol seçin ve **Tamamla** çıkışını bağlayın.
-2. Bir onay düğümünde **Onay** ve **Ret** bağlantılarını oluşturun. **Ret** bağlantısını sonucu **Reddedildi** olan bir bitiş düğümüne bağlayın.
-3. Karar düğümünde bir **Koşul sağlanırsa** ve bir **Varsayılan yol** bağlantısı tanımlayın. Örneğin form tasarımcısında oluşturduğunuz `oncelik` alanını karar değişkeni olarak seçin.
-4. **Taslağı kaydet → Süreç önizleme → Yayımla** adımlarını izleyin. Çalışan yayımlanan süreci **Talep oluştur** ekranında seçebilir.
+**Akışı kur** sekmesinde sol panelden adımları ekle ve tuvalde sürükleyerek yerleştir. Bir adımın çıkışını hedefe sürükle veya çıkışa tıklayıp sağdaki **Adım ayarları** panelinde hedefi seç ve **Bağla**'ya bas. Onay adımını seçip aynı panelden sorumlu rolü belirle. **Form** sekmesinde ihtiyacın olan ek alanları oluşturabilirsin.
+
+Karar düğümünü seçip **Koşul hedefini seç** düğmesine bas. Tuvalde hedefe tıkla, kuralını gir ve **Koşulu kaydet** düğmesine bas. Ardından **Varsayılan hedefi seç** ile kural sağlanmadığında izlenecek hedefi bağla.
 
 ## Teknolojiler
 

@@ -5,7 +5,7 @@
     <h1 class="h2 mt-3">Süreç önizleme</h1>
     <div class="surface-card mt-3">
         <h2 class="h5">@Model.Name</h2>
-        <p class="text-muted">Örnek değerlerle başlangıçtan ilk insan görevine veya bitişe kadar yolu kontrol edin.</p>
+        <p class="text-muted">Örnek değerleri gir ve sürecin hangi görevle başladığını veya nasıl bittiğini gör. Önizleme sırasında gerçek talep oluşturulmaz.</p>
         <form asp-action="GraphPreview" asp-route-id="@Model.Id" method="post">
             <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>
             <div class="row g-3 mb-3">
@@ -24,6 +24,10 @@
             {
                 <ol class="mb-0">@foreach (var step in Model.Route) { <li>@step</li> }</ol>
             }
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <a asp-action="Designer" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Akışa dön</a>
+            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-primary">@(Model.IsDraft ? "Yayımlamaya geç" : "Süreç detayına git")</a>
         </div>
     }
 </section>

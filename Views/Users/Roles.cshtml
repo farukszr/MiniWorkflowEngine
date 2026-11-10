@@ -4,7 +4,7 @@
     <a asp-action="Index" class="small text-decoration-none">← Kullanıcılara dön</a>
     <h1 class="h2 mt-4">Rolleri düzenle</h1>
     <p class="mb-1 fw-semibold">@Model.FullName</p><p class="text-muted">@Model.Email</p>
-    <div class="alert alert-light border small">Rol değişikliği kullanıcının diğer oturumlarını kapatır. Son yöneticinin yönetici rolü kaldırılamaz.</div>
+    <div class="alert alert-info small">Rol değişikliği kullanıcının diğer oturumlarını kapatır. Son yöneticinin yönetici rolü kaldırılamaz.</div>
     <form asp-action="Roles" asp-route-id="@Model.Id" method="post">
         <input asp-for="Id" type="hidden" /><input asp-for="ConcurrencyStamp" type="hidden" />
         <div asp-validation-summary="All" class="text-danger validation-summary" role="alert"></div>

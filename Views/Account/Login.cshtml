@@ -3,14 +3,13 @@
 <section class="auth-shell" aria-labelledby="login-title">
     <div class="auth-intro">
         <span class="eyebrow">İş akışı yönetimi</span>
-        <h1>Talepten karara.</h1>
+        <h1>Talep ve onay yönetimi</h1>
         <p>Onay adımlarını, taleplerinizi ve işlem geçmişini aynı çalışma alanında takip edin.</p>
         <partial name="_WorkflowIllustration" />
     </div>
     <div class="auth-card">
         <span class="shortcut-icon auth-icon"><partial name="_Icon" model='"shield"' /></span>
-        <h2 id="login-title">Tekrar hoş geldiniz</h2>
-        <p class="text-muted mb-4">Devam etmek için hesabınızla giriş yapın.</p>
+        <h2 id="login-title" class="mb-4">Giriş yap</h2>
         @if (TempData["Success"] is string success)
         {
             <div class="alert alert-success" role="status">@success</div>

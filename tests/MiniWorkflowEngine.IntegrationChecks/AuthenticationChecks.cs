@@ -80,9 +80,14 @@ internal static partial class AuthenticationChecks
             Require((await employeeClient.GetAsync("/")).StatusCode == HttpStatusCode.OK, "Çalışan ana sayfaya erişebilmeli.");
             var adminStart = WebUtility.HtmlDecode(await adminClient.GetStringAsync("/"));
             var employeeStart = WebUtility.HtmlDecode(await employeeClient.GetStringAsync("/"));
-            Require(adminStart.Contains("İlk masraf onayını deneyin") && adminStart.Contains("/Workflows/Create") &&
-                employeeStart.Contains("Kurum yöneticiniz bir süreç yayımladığında") && !employeeStart.Contains("/Workflows/Create"),
+            Require(adminStart.Contains("Yeni akış tasarla") && adminStart.Contains("/Workflows/Designer?ornek=masraf") &&
+                employeeStart.Contains("Kurum yöneticiniz bir süreç yayımladığında") && employeeStart.Contains("/Requests/Create") &&
+                !employeeStart.Contains("/Workflows/Designer") && !employeeStart.Contains("/Administration"),
                 "İlk girişte yönetici kurulum adımını, çalışan süreç bekleme durumunu görmeli.");
+            var management = await adminClient.GetStringAsync("/Administration");
+            Require(management.Contains("href=\"/Users\"") && management.Contains("href=\"/Departments\"") &&
+                management.Contains("href=\"/Administration/Reports\"") && management.Contains("href=\"/Administration/History\""),
+                "Yönetim ekranı hesap, departman, rapor ve geçmiş bağlantılarını sunmalı.");
             Console.WriteLine("BAŞARILI: Yönetici/çalışan erişim ayrımı ve yerel dönüş adresi.");
 
             await CheckUserAdministrationAsync(factory, adminClient, employeeClient);

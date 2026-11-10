@@ -28,6 +28,14 @@
     }
     @if (TempData["Success"] is string success) { <div class="alert alert-success mt-3" role="status">@success</div> }
     <div asp-validation-summary="All" class="text-danger validation-summary mt-3" role="alert"></div>
+    @if (Model.CanDecide)
+    {
+        <div class="work-next mt-3"><p><strong>Sıradaki iş</strong> @request.CurrentStepName</p><a href="#request-decision" class="btn btn-primary btn-sm">@(isTask ? "Göreve geç" : "Karar ver")</a></div>
+    }
+    else if (Model.CanSubmit)
+    {
+        <div class="work-next mt-3"><p><strong>@(returned ? "Düzeltme bekleniyor" : "Talep taslak olarak kaydedildi")</strong> Bilgileri kontrol edip hazır olduğunda gönder.</p><a href="#request-submit" class="btn btn-outline-primary btn-sm">Gönderme adımına geç</a></div>
+    }
     <div class="request-layout mt-4">
         <div>
             <section class="surface-card">
@@ -46,7 +54,7 @@
                 }
                 @if (Model.CanEdit)
                 {
-                    <div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@request.Id">@(returned ? "Talebi düzelt" : "Taslağı düzenle")</a>
+                    <div id="request-submit" class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@request.Id">@(returned ? "Talebi düzelt" : "Taslağı düzenle")</a>
                     @if (Model.CanSubmit)
                     {
                         <form asp-action="Submit" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><button class="btn btn-primary">@(returned ? "Yeniden gönder" : "Onaya gönder")</button></form>
@@ -57,7 +65,7 @@
             </section>
             @if (Model.CanDecide)
             {
-                <section class="surface-card mt-4"><h2 class="h5">@(isTask ? "Kullanıcı görevi" : "Onay kararı")</h2><p class="text-muted small">@request.CurrentStepName adımı. Ret ve iade işlemlerinde gerekçe zorunludur.</p>
+                <section id="request-decision" class="surface-card mt-4" tabindex="-1"><h2 class="h5">@(isTask ? "Kullanıcı görevi" : "Onay kararı")</h2><p class="text-muted small">@request.CurrentStepName adımı. Ret ve iade işlemlerinde gerekçe zorunludur.</p>
                     @if (Model.IsAdministrativeDecision)
                     {
                         <p class="alert alert-warning py-2 small">Bu adım için yönetici olarak karar veriyorsunuz. Kararınız işlem geçmişine yönetici kararı olarak kaydedilir.</p>
@@ -75,7 +83,7 @@
             }
             @if (Model.CanCancel)
             {
-                <section class="surface-card mt-4"><h2 class="h6">Talebi iptal et</h2><p class="small text-muted">İptal edilen talep yeniden gönderilemez.</p><form asp-action="Cancel" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><label for="cancel-note" class="form-label small">İptal notu (isteğe bağlı)</label><textarea id="cancel-note" name="Comment" class="form-control mb-3" rows="2" maxlength="2000">@Model.Comment</textarea><button class="btn btn-outline-secondary btn-sm">Talebi iptal et</button></form></section>
+                <details class="surface-card mt-4" open="@(!ViewData.ModelState.IsValid)"><summary class="fw-semibold">Talebi iptal et</summary><p class="small text-muted mt-2">İptal edilen talep yeniden gönderilemez.</p><form asp-action="Cancel" asp-route-id="@request.Id" method="post"><input type="hidden" name="Id" value="@request.Id" /><input type="hidden" name="RowVersion" value="@request.RowVersion" /><input type="hidden" name="Scope" value="@Model.Scope" /><label for="cancel-note" class="form-label small">İptal notu (isteğe bağlı)</label><textarea id="cancel-note" name="Comment" class="form-control mb-3" rows="2" maxlength="2000">@Model.Comment</textarea><button class="btn btn-outline-danger btn-sm">İptali onayla</button></form></details>
             }
         </div>
         <section class="surface-card history-card"><h2 class="h5">İşlem geçmişi</h2><p class="small text-muted">Tüm zamanlar UTC olarak gösterilir.</p><ol class="request-history">

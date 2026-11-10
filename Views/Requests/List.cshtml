@@ -15,7 +15,10 @@
     ViewData["Title"] = title;
 }
 <section class="my-4">
-    <div class="page-heading"><div><span class="eyebrow">ÇALIŞMA ALANI / TALEPLER</span><h1 class="h2 mt-2">@title</h1><p class="text-muted mb-0">@description</p></div><a class="btn btn-primary" asp-action="Create">+ Talep oluştur</a></div>
+    <div class="page-heading">
+        <div><h1 class="h2">@title</h1><p class="text-muted mb-0">@description</p></div>
+        @if (Model.Scope == RequestListScope.Mine) { <a class="btn btn-primary" asp-action="Create">+ Talep oluştur</a> }
+    </div>
     <div class="surface-card mt-4">
         <form asp-action="@action" method="get" class="directory-search" role="search">
             <div class="flex-grow-1"><label for="search" class="form-label">Başlık veya süreç adı</label><input class="form-control" id="search" name="search" value="@Model.Search" maxlength="100" placeholder="Talep ara…" /></div>
@@ -27,7 +30,8 @@
             {
                 <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="overdue" value="true" checked="@Model.Overdue" /> Yalnızca gecikenler</label>
             }
-            <button class="btn btn-outline-primary">Filtrele</button><a asp-action="@action" class="btn btn-link">Temizle</a>
+            <button class="btn btn-outline-primary">Filtrele</button>
+            @if (!string.IsNullOrWhiteSpace(Model.Search) || Model.Status.HasValue || Model.Overdue) { <a asp-action="@action" class="btn btn-link">Temizle</a> }
         </form>
         @if (showRequester)
         {
@@ -36,16 +40,16 @@
         <p class="small text-muted mt-3">@Model.TotalCount talep · Sayfa @Model.Page / @Model.TotalPages</p>
         @if (Model.Items.Count == 0)
         {
-            <div class="empty-state"><h2 class="h5">@(inbox ? "Bekleyen görev bulunmuyor" : "Talep bulunamadı")</h2><p class="text-muted mb-0">@(inbox ? "Size atanan onaylar, kullanıcı görevleri ve düzeltmeler burada görünür." : "Arama ve durum filtrelerinizi değiştirebilirsiniz.")</p></div>
+            <div class="empty-state"><h2 class="h5">@(inbox ? "Bekleyen görev bulunmuyor" : "Talep bulunamadı")</h2><p class="text-muted mb-0">@(inbox ? "Size atanan onaylar, kullanıcı görevleri ve düzeltmeler burada görünür." : "Yeni talepler kaydedildiğinde burada görünür. Filtre kullandıysanız sonuçları görmek için temizleyebilirsiniz.")</p></div>
         }
         else
         {
-            <div class="table-responsive"><table class="table align-middle user-table"><caption class="visually-hidden">@ViewData["Title"]</caption><thead><tr><th scope="col">Talep</th>@if (showRequester) { <th scope="col">Talep sahibi</th> }<th scope="col">Durum / adım</th><th scope="col">Tutar</th><th scope="col">Oluşturulma (UTC)</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead><tbody>
+            <div class="table-responsive"><table class="table align-middle user-table request-list-table"><caption class="visually-hidden">@ViewData["Title"]</caption><thead><tr><th scope="col">Talep</th>@if (showRequester) { <th scope="col" class="d-none d-lg-table-cell">Talep sahibi</th> }<th scope="col">Durum / adım</th><th scope="col" class="d-none d-md-table-cell">Tutar</th><th scope="col" class="d-none d-xl-table-cell">Oluşturulma (UTC)</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead><tbody>
             @foreach (var item in Model.Items)
             {
                 <tr>
                     <td><a class="fw-semibold text-decoration-none" asp-action="Details" asp-route-id="@item.Id" asp-route-scope="@Model.Scope">#@item.Id · @item.Title</a><span class="d-block small text-muted">@item.WorkflowName · v@(item.WorkflowVersion)</span></td>
-                    @if (showRequester) { <td>@item.RequesterName</td> }
+                    @if (showRequester) { <td class="d-none d-lg-table-cell">@item.RequesterName</td> }
                     <td>
                         <span class="request-status @RequestLabels.StatusClass(item.Status)">@RequestLabels.Status(item.Status)</span>
                         @if (item.CurrentStepName is not null) { <span class="d-block small text-muted mt-1">@item.CurrentStepName</span> }
@@ -54,8 +58,8 @@
                             <span class="d-block small mt-1 @(ApprovalWaiting.IsOverdue(since, now) ? "text-danger fw-semibold" : "text-muted")">@(ApprovalWaiting.IsOverdue(since, now) ? "Gecikti · " : "")@ApprovalWaiting.Duration(since, now) bekliyor</span>
                         }
                     </td>
-                    <td class="text-nowrap">@(item.Amount?.ToString("N2") ?? "—")</td><td class="small text-muted text-nowrap">@item.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</td>
-                    <td class="text-end"><a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@item.Id" asp-route-scope="@Model.Scope">İncele</a></td>
+                    <td class="text-nowrap d-none d-md-table-cell">@(item.Amount?.ToString("N2") ?? "—")</td><td class="small text-muted text-nowrap d-none d-xl-table-cell">@item.CreatedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td class="text-end"><a class="btn @(inbox ? "btn-primary" : "btn-outline-secondary") btn-sm" asp-action="Details" asp-route-id="@item.Id" asp-route-scope="@Model.Scope">İncele</a></td>
                 </tr>
             }
             </tbody></table></div>

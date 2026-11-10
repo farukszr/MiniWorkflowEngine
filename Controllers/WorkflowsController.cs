@@ -16,7 +16,8 @@ namespace MiniWorkflowEngine.Controllers;
 public sealed class WorkflowsController(WorkflowDefinitionService service, ApplicationDbContext db) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(string? search, int page = 1) => View(await service.ListAsync(search, page));
+    public async Task<IActionResult> Index(string? search, int page = 1, WorkflowListState state = WorkflowListState.All)
+        => View(await service.ListAsync(search, page, state));
 
     [HttpGet]
     public async Task<IActionResult> Create() => View("Edit", new WorkflowEditorViewModel
@@ -66,7 +67,7 @@ public sealed class WorkflowsController(WorkflowDefinitionService service, Appli
 
     [HttpPost]
     [RequestSizeLimit(256_000)]
-    public async Task<IActionResult> Designer(int? id, GraphEditorViewModel model)
+    public async Task<IActionResult> Designer(int? id, GraphEditorViewModel model, string? next)
     {
         if ((id ?? 0) != model.Id) return BadRequest();
         if (ModelState.IsValid)
@@ -75,7 +76,7 @@ public sealed class WorkflowsController(WorkflowDefinitionService service, Appli
             if (result.Succeeded)
             {
                 TempData["Success"] = "Görsel taslak kaydedildi. Kullanıma açmak için yayımlayın.";
-                return RedirectToAction(nameof(Details), new { id = result.Id });
+                return RedirectToAction(next == "preview" ? nameof(GraphPreview) : nameof(Details), new { id = result.Id });
             }
             ModelState.AddModelError(string.Empty, result.Error!);
         }
@@ -129,6 +130,7 @@ public sealed class WorkflowsController(WorkflowDefinitionService service, Appli
                         _ when target.Outcome == EndOutcome.Rejected => $"Talep reddedilir: {target.Name}",
                         _ => $"Süreç doğrudan tamamlanır: {target.Name}"
                     };
+                    model.IsDraft = (await service.GetAsync(id))?.CanEdit == true;
                 }
             }
         }

@@ -5,9 +5,9 @@ namespace MiniWorkflowEngine.ViewModels;
 public sealed class GraphEditorViewModel
 {
     public int Id { get; set; }
-    [Required(ErrorMessage = "Süreç kodu girin."), RegularExpression("^[A-Za-z][A-Za-z0-9_]{1,49}$", ErrorMessage = "Geçerli bir süreç kodu girin.")]
+    [RegularExpression("^[A-Za-z][A-Za-z0-9_]{1,49}$", ErrorMessage = "Süreç kodu bir harfle başlamalı ve yalnızca İngilizce harf, rakam veya alt çizgi içermelidir.")]
     [Display(Name = "Süreç kodu")]
-    public string Code { get; set; } = "";
+    public string? Code { get; set; }
     [Required(ErrorMessage = "Süreç adı girin."), StringLength(150, MinimumLength = 2, ErrorMessage = "Süreç adı 2–150 karakter olmalıdır.")]
     [Display(Name = "Süreç adı")]
     public string Name { get; set; } = "";

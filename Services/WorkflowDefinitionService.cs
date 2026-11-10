@@ -50,19 +50,31 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
         }
     }
 
-    public async Task<WorkflowListViewModel> ListAsync(string? search, int page)
+    public async Task<WorkflowListViewModel> ListAsync(string? search, int page, WorkflowListState state)
     {
         search = search?.Trim();
         if (search?.Length > 100) search = search[..100];
         var query = db.WorkflowDefinitions.AsNoTracking();
         if (!string.IsNullOrEmpty(search)) query = query.Where(x => x.Code.Contains(search) || x.Name.Contains(search));
-        var count = await query.CountAsync();
+        var items = query.Select(x => new
+        {
+            x.Id, x.Code, x.Name, x.Version, x.IsActive, IsGraph = x.GraphJson != null,
+            IsPublished = x.PublishedAt != null || x.IsActive || db.WorkflowRequests.Any(r => r.WorkflowDefinitionId == x.Id)
+        });
+        items = state switch
+        {
+            WorkflowListState.Active => items.Where(x => x.IsActive),
+            WorkflowListState.Draft => items.Where(x => !x.IsPublished),
+            WorkflowListState.Archived => items.Where(x => x.IsPublished && !x.IsActive),
+            _ => items
+        };
+        var count = await items.CountAsync();
         var pages = Math.Max(1, (int)Math.Ceiling(count / 20d));
         page = Math.Clamp(page, 1, pages);
-        return new WorkflowListViewModel { Search = search, Page = page, TotalPages = pages, TotalCount = count,
-            Items = await query.OrderBy(x => x.Code).ThenByDescending(x => x.Version).Skip((page - 1) * 20).Take(20)
+        return new WorkflowListViewModel { Search = search, State = state, Page = page, TotalPages = pages, TotalCount = count,
+            Items = await items.OrderBy(x => x.Code).ThenByDescending(x => x.Version).Skip((page - 1) * 20).Take(20)
                 .Select(x => new WorkflowListItem { Id = x.Id, Code = x.Code, Name = x.Name, Version = x.Version,
-                    IsActive = x.IsActive, IsPublished = x.PublishedAt != null || x.IsActive || db.WorkflowRequests.Any(r => r.WorkflowDefinitionId == x.Id), StepCount = x.Steps.Count }).ToListAsync() };
+                    IsActive = x.IsActive, IsPublished = x.IsPublished, IsGraph = x.IsGraph }).ToListAsync() };
     }
 
     public async Task<List<SelectListItem>> RolesAsync()
@@ -115,7 +127,8 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
     public Task<WorkflowOperationResult> SaveGraphAsync(GraphEditorViewModel model, string actorId)
         => ExecuteAsync(actorId, async () =>
         {
-            if (!Regex.IsMatch(model.Code, "^[A-Za-z][A-Za-z0-9_]{1,49}$") || model.Name.Trim().Length is < 2 or > 150 ||
+            var code = model.Code?.Trim().ToUpperInvariant();
+            if ((code is not null && !Regex.IsMatch(code, "^[A-Z][A-Z0-9_]{1,49}$")) || model.Name.Trim().Length is < 2 or > 150 ||
                 model.Description?.Length > 2000 || model.GraphJson.Length > GraphRules.MaxDocumentLength)
                 return WorkflowOperationResult.Failure("Süreç kodu, adı veya belge boyutu geçersiz.");
             WorkflowGraph? graph;
@@ -125,12 +138,12 @@ public sealed class WorkflowDefinitionService(ApplicationDbContext db, WorkflowC
             var error = GraphRules.Validate(graph, publishing: false);
             if (error is not null) return WorkflowOperationResult.Failure(error);
 
-            var code = model.Code.ToUpperInvariant();
             WorkflowDefinition entity;
             if (model.Id == 0)
             {
+                code ??= $"AKIS_{Guid.NewGuid():N}".ToUpperInvariant();
                 if (await db.WorkflowDefinitions.AnyAsync(x => x.Code == code))
-                    return WorkflowOperationResult.Failure("Bu süreç kodu zaten kullanımda.");
+                    return WorkflowOperationResult.Failure("Bu süreç kodu zaten kullanımda. Süreç bilgileri altında kodu boş bırakarak otomatik oluşturabilir veya farklı bir kod girebilirsiniz.");
                 entity = new WorkflowDefinition { Code = code };
                 db.WorkflowDefinitions.Add(entity);
             }

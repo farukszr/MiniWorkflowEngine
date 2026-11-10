@@ -4,6 +4,7 @@
     var isAdmin = User.IsInRole(ApplicationRoles.Administrator);
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewData["RequestNavigation"] as string ?? ViewContext.RouteData.Values["action"]?.ToString();
+    var studio = signedIn && controller == "Workflows" && action == "Designer";
     var accountName = User.Identity?.Name ?? "";
     var accountRoles = string.Join(" · ", User.FindAll(System.Security.Claims.ClaimTypes.Role)
         .Select(claim => ApplicationRoles.DisplayName(claim.Value)).Distinct());
@@ -13,19 +14,15 @@
         ("Requests", "Index", "Taleplerim", "requests"),
         ("Requests", "Inbox", "Bekleyen onaylar", "inbox")
     };
-    var adminNav = new List<(string Controller, string Action, string Label, string Icon)>
+    var processNav = new List<(string Controller, string Action, string Label, string Icon)>
     {
-        ("Administration", "Index", "Yönetim", "settings"),
-        ("Users", "Index", "Kullanıcı yönetimi", "users"),
-        ("Departments", "Index", "Departmanlar", "users"),
         ("Workflows", "Index", "Süreç tanımları", "workflow"),
-        ("Administration", "History", "Yönetim geçmişi", "requests"),
-        ("Administration", "Reports", "Raporlar", "requests"),
-        ("Requests", "All", "Tüm talepler", "requests")
+        ("Requests", "All", "Tüm talepler", "requests"),
+        ("Administration", "Index", "Yönetim", "settings")
     };
 }
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -35,23 +32,30 @@
 </head>
 <body class="@(signedIn ? "workspace-body" : "public-body")">
     <a class="skip-link" href="#main-content">İçeriğe geç</a>
-    @if (signedIn)
+    @if (studio)
+    {
+        <main id="main-content" class="studio-main" tabindex="-1">@RenderBody()</main>
+    }
+    else if (signedIn)
     {
         <div class="workspace-shell">
             <aside class="workspace-sidebar" aria-label="Çalışma alanı menüsü">
                 <div class="sidebar-heading">
-                    <a class="brand" asp-controller="Home" asp-action="Index"><span class="brand-mark"><partial name="_Icon" model='"brand"' /></span><span class="brand-name">MiniWorkflowEngine</span></a>
+                    <a class="brand" asp-controller="Home" asp-action="Index"><span class="brand-mark"><partial name="_Icon" model='"brand"' /></span><span><span class="brand-name">MiniWorkflowEngine</span><span class="brand-subtitle">İş akışı yönetimi</span></span></a>
                     <button class="btn mobile-menu-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation" aria-expanded="false" aria-label="Menüyü aç/kapat">
                         <partial name="_Icon" model='"menu"' />
                         <span class="approval-count" aria-hidden="true" hidden></span>
                     </button>
                 </div>
                 <div id="main-navigation" class="collapse sidebar-content">
+                    <a class="btn btn-primary workspace-create" asp-controller="Requests" asp-action="Create" aria-current="@(controller == "Requests" && action == "Create" ? "page" : null)">
+                        <partial name="_Icon" model='"plus"' />Talep oluştur
+                    </a>
                     <nav aria-label="Ana menü">
                         <p class="nav-caption">Çalışma alanı</p>
                         @foreach (var item in nav)
                         {
-                            var active = controller == item.Controller && (action == item.Action || (item.Action == "Index" && controller == "Requests" && action is not ("Inbox" or "All")));
+                            var active = controller == item.Controller && (action == item.Action || (item.Action == "Index" && controller == "Requests" && action is not ("Inbox" or "All" or "Create")));
                             var isInbox = item.Action == "Inbox";
                             <a class="workspace-link @(active ? "is-active" : "")" asp-controller="@item.Controller" asp-action="@item.Action" aria-current="@(active ? "page" : null)" data-approval-url="@(isInbox ? Url.Action("PendingCount", "Requests") : null)">
                                 <partial name="_Icon" model="item.Icon" />@item.Label
@@ -64,10 +68,15 @@
                         @if (isAdmin)
                         {
                             <p class="nav-caption nav-caption-spaced">Yönetici alanı</p>
-                            @foreach (var item in adminNav)
+                            @foreach (var item in processNav)
                             {
-                                var active = controller == item.Controller && (controller is not ("Requests" or "Administration") || action == item.Action);
-                                <a class="workspace-link @(active ? "is-active" : "")" asp-controller="@item.Controller" asp-action="@item.Action" aria-current="@(active ? "page" : null)"><partial name="_Icon" model="item.Icon" />@item.Label</a>
+                                var active = item.Controller switch
+                                {
+                                    "Administration" => controller is "Administration" or "Users" or "Departments",
+                                    "Requests" => controller == "Requests" && action == "All",
+                                    _ => controller == item.Controller
+                                };
+                                <a class="workspace-link @(active ? "is-active" : "")" asp-controller="@item.Controller" asp-action="@item.Action" aria-current="@(active ? "location" : null)"><partial name="_Icon" model="item.Icon" />@item.Label</a>
                             }
                         }
                     </nav>
@@ -84,7 +93,7 @@
             </aside>
             <div class="workspace-content">
                 <header class="workspace-topbar">
-                    <span>Çalışma alanı</span><span aria-hidden="true">/</span><strong>@ViewData["Title"]</strong>
+                    <a asp-controller="Home" asp-action="Index">Çalışma alanı</a><span aria-hidden="true">/</span><strong>@ViewData["Title"]</strong>
                 </header>
                 <main id="main-content" class="workspace-main" tabindex="-1">@RenderBody()</main>
                 <footer class="app-footer"><span>MiniWorkflowEngine</span><a asp-controller="Home" asp-action="Privacy">Gizlilik</a></footer>
