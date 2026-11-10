@@ -1,6 +1,9 @@
 # MiniWorkflowEngine
 
-MiniWorkflowEngine, şirket içindeki talepleri doğru kişiye yönlendirir ve verilen kararları kaydeder. Yönetici onay kurallarını sürükle-bırak ile tanımlar. Çalışan talebini gönderir ve durumunu takip eder. Yetkili, kendisine atanan talepleri onaylar, reddeder veya düzeltmeye gönderir.
+MiniWorkflowEngine, şirket içindeki talepleri doğru kişiye yönlendirir ve verilen kararları kaydeder.\
+Yönetici onay kurallarını sürükle-bırak ile tanımlar.\
+Çalışan talebini gönderir ve durumunu takip eder.\
+Yetkili, kendisine atanan talepleri onaylar, reddeder veya düzeltmeye gönderir.
 
 Örneğin şirket, 10.000 TL üzerindeki masraf taleplerini onaylayıcıya yönlendirebilir. Çalışan, talebin hangi aşamada olduğunu ve sonucu uygulamadan görebilir.
 
